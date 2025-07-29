@@ -1,3 +1,46 @@
+Phase 1: Architecture & Foundation
+The entire team is focused on building a robust skeleton that can support the full vision.
+Workstream 1: AI & Data Foundation:
+Data Sourcing & Contracts: Finalize and secure commercial API access to all data sources:
+Ticket Marketplaces: StubHub, SeatGeek, Ticketmaster, etc.
+Sports Data: Sportradar or similar for real-time stats, schedules, player data, and injury feeds.
+External Data: Weather APIs, news APIs.
+Data Warehouse Architecture: Design the PostgreSQL/TimescaleDB schema to handle billions of data points. This includes historical ticket prices, player stats over time, team performance, etc. This design must be forward-looking to accommodate all planned features.
+Initial Data Ingestion: Begin the massive task of back-filling your database with years of historical data. This is the fuel for your AI models.
+Workstream 2: Application & Infrastructure Foundation:
+Set up on Railway: Provision the production-level PostgreSQL and Redis databases and configure the backend service.
+Microservices Planning: Architect the backend not as a single monolith, but as a series of services. For example:
+A core API service for user accounts and basic data.
+A dedicated "Sync Engine" service for managing listings.
+A dedicated "Inference" service to serve AI model predictions.
+Secure Authentication: Build the user registration, login, and account management system. Implement multi-factor authentication from the start.
+Workstream 3: UI/UX Design:
+Complete Design System: The designer will create a comprehensive design system in Figma, detailing every component, color, font, and interaction.
+Full Application Mockups: Design every single screen for the full production model, including the rich, interactive dashboards, the automation rule-builder, and the detailed analytics pages. This ensures the frontend team is building towards a final, polished vision.
+Phase 2: Parallel Core Development 
+The team now splits to build the core components simultaneously.
+Workstream 1: AI Model Development (The "Quant" Team):
+Feature Engineering: The AI Engineer sifts through the historical data to identify the most predictive features. How much does a 5-game winning streak really affect price? What's the dollar value of a "Rivalry Game"?
+Model Training & Selection: Train and benchmark multiple models (XGBoost, LSTMs, etc.) for each predictive task:
+Optimal Price Point (OPP) Model: The core price prediction.
+Price Decay/Forecast Model: Predicting the price curve over time.
+Sentiment Analysis Model: Training a fine-tuned NLP model on sports news and social media data to generate a "Hype Score."
+Develop the Inference API: Create a fast, internal API endpoint where the main application can send ticket details (e.g., "Lakers vs. Warriors, Section 110, Oct 25") and get a rich JSON object back with all the AI predictions.
+Workstream 2: Sync Engine & API Development:
+Build All Marketplace Integrations: The API developer works through the documentation for every target marketplace, building the robust integrations for listing, de-listing, and price updating. This is a painstaking, detail-oriented task.
+Develop the Core Application Logic: Build the backend functionality for managing a user's ticket portfolio, calculating P&L, and connecting their marketplace accounts via OAuth.
+Workstream 3: Frontend Development:
+Build the "Static" Application: The frontend developer, using the completed designs, builds out the entire user interface with dummy data. This includes the dashboard layout, settings pages, and ticket list views.
+Connect to the Core API: Integrate the frontend with the backend to pull real user data, display their ticket portfolio, and allow them to perform basic actions.
+Phase 3: Integration, Automation & Polish
+This is where all the separate workstreams converge to create the magic of the final product.
+Connecting the AI to the UI: This is the most exciting step. The frontend is connected to the AI's Inference API. Suddenly, the static charts become live, interactive price forecast curves. The dashboard populates with the "Hype Score" and "Key Price Drivers." The Optimal Price Point appears in the listing interface.
+Building the Automation Engine:
+Develop the backend logic for the dynamic pricing strategies ("Maximize Profit," "Ensure Sale"). This engine will consume the AI predictions and automatically adjust listing prices via the Sync Engine.
+Create the "Rule Builder" interface on the frontend and the backend logic to execute those custom rules.
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
 Here is an in-depth, structured development plan to build SeatSync as the robust, cutting-edge, AI-driven web application you envision. We will follow a phased approach, starting with a powerful core (the Minimum Viable Product) and progressively layering on the sophisticated AI features.
 This roadmap is designed to manage complexity, achieve milestones, and build momentum.
 Phase 0: Foundation & Strategic Planning (Months 0-1)
