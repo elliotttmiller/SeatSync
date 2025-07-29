@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.api.v1.api import api_router
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
+from sqlalchemy import text
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG if settings.DEBUG else logging.INFO)
@@ -82,9 +83,9 @@ async def root():
     return {"message": "Welcome to SeatSync API"}
 
 @app.get("/health")
-async def health_check(db: AsyncSession = Depends(get_db)):
+async def health(db: AsyncSession = Depends(get_db)):
     try:
-        await db.execute("SELECT 1")
+        await db.execute(text("SELECT 1"))
         return {"status": "healthy"}
     except Exception as e:
         return {"status": "unhealthy", "error": str(e)}

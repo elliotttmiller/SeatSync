@@ -14,18 +14,16 @@ router = APIRouter()
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 class LoginRequest(BaseModel):
-    username: str
+    email: str
     password: str
 
 @router.post("/login")
 async def login(login_request: LoginRequest, db: AsyncSession = Depends(get_db), response: Response = None):
     print("DEBUG login_request:", login_request)
-    # For further debugging, print the raw request body if needed
-    # import inspect; print(inspect.signature(login))
-    username = login_request.username
+    email = login_request.email
     password = login_request.password
     # TODO: Implement async user authentication
-    # user = await authenticate_user(username, password, db)
+    # user = await authenticate_user(email, password, db)
     # if not user:
     #     raise HTTPException(status_code=401, detail="Invalid credentials")
     # access_token = create_access_token(data={"sub": str(user.id)})
