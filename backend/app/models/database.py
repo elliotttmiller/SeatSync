@@ -1,12 +1,12 @@
 from sqlalchemy import create_engine, Column, String, Integer, Boolean, DateTime, DECIMAL, Text, JSON, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB, INET
 from sqlalchemy.sql import func
 import uuid
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 Base = declarative_base()
 
@@ -206,9 +206,7 @@ class UserResponse(BaseModel):
     is_verified: bool
     subscription_tier: str
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class SeasonTicketCreate(BaseModel):
     team: str
@@ -235,9 +233,7 @@ class SeasonTicketResponse(BaseModel):
     total_games: Optional[int]
     games_remaining: Optional[int]
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ListingCreate(BaseModel):
     season_ticket_id: uuid.UUID
@@ -257,9 +253,7 @@ class ListingResponse(BaseModel):
     final_price: Optional[float]
     sold_at: Optional[datetime]
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class AIPredictionResponse(BaseModel):
     id: uuid.UUID
@@ -269,10 +263,7 @@ class AIPredictionResponse(BaseModel):
     confidence_score: Optional[float]
     features: Optional[dict]
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
-        protected_namespaces = ()
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
 class AutomationRuleCreate(BaseModel):
     name: str
@@ -288,6 +279,4 @@ class AutomationRuleResponse(BaseModel):
     actions: dict
     is_active: bool
     created_at: datetime
-    
-    class Config:
-        from_attributes = True 
+    model_config = ConfigDict(from_attributes=True) 

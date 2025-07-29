@@ -299,3 +299,16 @@ Desktop.ini
 # Temporary files
 *.tmp
 *.temp 
+
+# Poetry
+poetry.lock
+
+# Ignore requirements.txt (generated only if needed)
+requirements.txt
+
+# Alembic
+alembic/versions/*.pyc
+alembic/versions/__pycache__/
+
+# Jupyter
+notebooks/ 
