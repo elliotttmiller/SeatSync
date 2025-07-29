@@ -7,15 +7,13 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Install system dependencies
+# Install system dependencies and Poetry in one layer
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
         libpq-dev \
+    && pip install --no-cache-dir poetry \
     && rm -rf /var/lib/apt/lists/*
-
-# Install Poetry
-RUN pip install poetry
 
 # Copy and install dependencies
 COPY pyproject.toml poetry.lock ./
