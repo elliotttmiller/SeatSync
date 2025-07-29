@@ -1,0 +1,53 @@
+# Server Configuration
+PORT=8080
+NODE_ENV=production
+
+# Database Configuration
+DATABASE_URL=postgresql://postgres:hTckoowSOUVGSbZXigsxWBVXxlXYFAfu@shinkansen.proxy.rlwy.net:57937/railway
+DATABASE_PUBLIC_URL=postgresql://postgres:hTckoowSOUVGSbZXigsxWBVXxlXYFAfu@shinkansen.proxy.rlwy.net:57937/railway
+NODE_ENV=development
+DB_SSL=true
+DB_NAME=railway
+DB_HOST=shinkansen.proxy.rlwy.net
+DB_PASSWORD=hTckoowSOUVGSbZXigsxWBVXxlXYFAfu
+DB_PORT=5432
+DB_USER=postgres
+
+# JWT Configuration
+JWT_SECRET=e19d51762a935f5e3bf94c670a535f466f12f6fa06fc1f4b3dc52ddaf733efc6
+JWT_EXPIRES_IN=24h
+
+# Plaid Configuration
+PLAID_CLIENT_ID=6878c62f8325000026a8eb6f
+PLAID_SECRET=7bf17d0cab6c264862db25dbb58516
+PLAID_ENV=sandbox
+
+# Sentry Configuration
+SENTRY_DSN=https://6870589f945b88361cbb65079060a3ce@o4509683080822784.ingest.us.sentry.io/4509683186204672
+
+# CORS Configuration
+CORS_ORIGIN=https://nexus-qwpxzc3yo-elliott-millers-projects.vercel.app,https://nexus-three-wheat.vercel.app,http://localhost:3000
+
+# Logging
+LOG_LEVEL=info 
+
+RAILWAY_TOKEN=d180a0c4-5635-456c-a3a7-4e806e907162
+
+GOOGLE_APPLICATION_CREDENTIALS=D:\AMD\secrets\nexus-ai-466614-377f29052243.json
+GOOGLE_PROJECT_ID=nexus-ai-466614
+GOOGLE_LOCATION=us-central1
+GOOGLE_CLOUD_PROJECT=nexus-ai-466614
+GOOGLE_CLOUD_LOCATION=us-central1
+GOOGLE_GENAI_USE_VERTEXAI=True
+GEMINI_API_KEY=377f290522436a08391e15e78d06ed173017de41
+GOOGLE_API_KEY=AIzaSyDbAxKNa6iaaCrV05nc0jmfmVyVR7XM28I
+AI_BASE_URL=https://aiservice-production-acab.up.railway.app
+API_BASE_URL=https://nexus-production-2e34.up.railway.app
+EXPO_PUBLIC_API_BASE_URL=https://nexus-production-2e34.up.railway.app
+
+REDIS_PUBLIC_URL=redis://default:GgYLyrVclQUGBXnGCtkQKTnELtcAmZMO@shinkansen.proxy.rlwy.net:40005
+REDIS_URL=redis://default:GgYLyrVclQUGBXnGCtkQKTnELtcAmZMO@shinkansen.proxy.rlwy.net:40005
+REDISHOST=redis.railway.internal
+REDISPASSWORD=GgYLyrVclQUGBXnGCtkQKTnELtcAmZMO
+REDISPORT=6379
+REDISUSER=default

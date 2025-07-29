@@ -1,74 +1,45 @@
-import time
+import asyncio
 import logging
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import QueuePool
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy import text
 from app.core.config import settings
 
 # --- Setup logging ---
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def create_database_engine_with_retry():
-    """
-    Creates a robust SQLAlchemy engine with a retry loop to handle startup race conditions in cloud environments.
-    """
-    database_url = settings.DATABASE_URL
-    if not database_url:
-        logger.critical("FATAL: DATABASE_URL is not set in the environment.")
-        raise ValueError("DATABASE_URL is not set.")
-
-    engine_config = {
-        "poolclass": QueuePool,
-        "pool_size": 10,
-        "max_overflow": 20,
-        "pool_pre_ping": True,
-        "pool_recycle": 3600,
-        "echo": settings.DEBUG,
-    }
-
-    max_retries = 10
-    retry_delay_seconds = 5
-    logger.info("Attempting to create database engine...")
-
-    for attempt in range(max_retries):
-        try:
-            engine = create_engine(database_url, **engine_config)
-            # Test the connection to ensure the database is ready
-            with engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
-            logger.info(f"---> Database connection successful on attempt {attempt + 1} <---")
-            return engine
-        except OperationalError as e:
-            logger.warning(f"Connection attempt {attempt + 1} of {max_retries} failed. Database may not be ready yet.")
-            if attempt + 1 < max_retries:
-                logger.info(f"Retrying in {retry_delay_seconds} seconds...")
-                time.sleep(retry_delay_seconds)
-            else:
-                logger.critical("Could not connect to the database after all retries.")
-                raise  # Re-raise the last exception to crash the app if it truly can't connect
-    raise Exception("Failed to create a database engine after multiple retries.")
-
-# --- Create the engine instance using our new robust function ---
-engine = create_database_engine_with_retry()
-
-# --- The rest of your professional setup remains the same ---
-
-# Create session factory
-SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine
+# --- Create async engine ---
+engine = create_async_engine(
+    settings.DATABASE_URL,
+    echo=settings.DEBUG,
+    pool_size=10,
+    max_overflow=20,
+    pool_pre_ping=True,
+    pool_recycle=3600,
 )
 
-def get_db() -> Session:
-    """Dependency to get database session"""
-    db = SessionLocal()
+# --- Create async session factory ---
+AsyncSessionLocal = async_sessionmaker(
+    bind=engine,
+    expire_on_commit=False,
+    class_=AsyncSession
+)
+
+async def get_db() -> AsyncSession:
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.close()
+
+# --- Async DB health check ---
+async def check_db_health() -> bool:
     try:
-        yield db
-    finally:
-        db.close()
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        return True
+    except Exception:
+        return False
 
 def init_db():
     """Initialize database tables"""
@@ -85,15 +56,6 @@ def init_db():
     except Exception as e:
         logger.error(f"Database initialization failed: {e}")
         raise
-
-def check_db_health() -> bool:
-    """Check database health"""
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        return True
-    except Exception:
-        return False
 
 def get_db_stats():
     """Get database statistics"""
