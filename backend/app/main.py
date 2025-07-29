@@ -6,6 +6,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 import traceback
 import json
+import os
 
 from app.core.config import settings
 from app.api.v1.api import api_router
@@ -91,9 +92,10 @@ async def health_check(db: AsyncSession = Depends(get_db)):
 # Railway specific: Use PORT environment variable
 if __name__ == "__main__":
     import uvicorn
+    port = int(os.environ.get("PORT", 8080))
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",
-        port=settings.PORT,
+        port=port,
         reload=settings.DEBUG
     ) 
