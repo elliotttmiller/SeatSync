@@ -272,6 +272,7 @@ class AIPredictionResponse(BaseModel):
     
     class Config:
         from_attributes = True
+        protected_namespaces = ()
 
 class AutomationRuleCreate(BaseModel):
     name: str
