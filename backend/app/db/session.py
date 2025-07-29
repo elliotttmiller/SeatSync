@@ -1,6 +1,6 @@
 import time
 import logging
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import QueuePool
 from sqlalchemy.exc import OperationalError
@@ -37,7 +37,7 @@ def create_database_engine_with_retry():
             engine = create_engine(database_url, **engine_config)
             # Test the connection to ensure the database is ready
             with engine.connect() as conn:
-                conn.execute("SELECT 1")
+                conn.execute(text("SELECT 1"))
             logger.info(f"---> Database connection successful on attempt {attempt + 1} <---")
             return engine
         except OperationalError as e:
@@ -77,7 +77,7 @@ def init_db():
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables created successfully")
         with engine.connect() as conn:
-            result = conn.execute("SELECT * FROM pg_extension WHERE extname = 'timescaledb'")
+            result = conn.execute(text("SELECT * FROM pg_extension WHERE extname = 'timescaledb'"))
             if result.fetchone():
                 logger.info("TimescaleDB extension is active")
             else:
@@ -90,7 +90,7 @@ def check_db_health() -> bool:
     """Check database health"""
     try:
         with engine.connect() as conn:
-            conn.execute("SELECT 1")
+            conn.execute(text("SELECT 1"))
         return True
     except Exception:
         return False
@@ -100,7 +100,7 @@ def get_db_stats():
     try:
         with engine.connect() as conn:
             # Get table sizes
-            result = conn.execute("""
+            result = conn.execute(text("""
                 SELECT 
                     schemaname,
                     tablename,
@@ -108,16 +108,16 @@ def get_db_stats():
                 FROM pg_tables 
                 WHERE schemaname = 'public'
                 ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
-            """)
+            """))
             table_sizes = result.fetchall()
             # Get connection info
-            result = conn.execute("""
+            result = conn.execute(text("""
                 SELECT 
                     count(*) as active_connections,
                     count(*) FILTER (WHERE state = 'active') as active_queries
                 FROM pg_stat_activity 
                 WHERE datname = current_database();
-            """)
+            """))
             connection_stats = result.fetchone()
             return {
                 "table_sizes": table_sizes,
