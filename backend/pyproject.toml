@@ -1,0 +1,13 @@
+[project]
+name = "seatsync-backend"
+version = "1.0.0"
+description = "AI-Powered Sports Ticket Portfolio Management Platform"
+requires-python = ">=3.11"
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+
+[tool.isort]
+profile = "black"
+line_length = 88 
