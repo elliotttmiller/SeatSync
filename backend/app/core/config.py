@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     # Database - Railway PostgreSQL
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL", 
-        "postgresql://postgres:password@localhost/seatsync"
+        "postgresql://postgres:qesRQjPRBDMUtHwrEFMGtXkzjqIepgnx@postgres.railway.internal:5432/railway"
     )
     
     # Redis - Railway Redis (optional)
