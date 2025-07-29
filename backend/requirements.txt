@@ -39,4 +39,5 @@ mypy==1.7.1
 
 # Environment and configuration
 pydantic==2.5.0
-pydantic-settings==2.1.0 
+pydantic-settings==2.1.0
+email-validator==2.1.0 
