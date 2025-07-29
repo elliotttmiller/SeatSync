@@ -35,11 +35,11 @@ def create_database_engine():
         with engine.connect() as conn:
             conn.execute("SELECT 1")
         
-        logger.info("✅ Database connection established successfully")
+                       logger.info("Database connection established successfully")
         return engine
         
     except Exception as e:
-        logger.error(f"❌ Database connection failed: {e}")
+                       logger.error(f"Database connection failed: {e}")
         raise
 
 # Create engine instance
@@ -67,18 +67,18 @@ def init_db():
     try:
         # Create all tables
         Base.metadata.create_all(bind=engine)
-        logger.info("✅ Database tables created successfully")
+                       logger.info("Database tables created successfully")
         
         # Verify TimescaleDB extension
         with engine.connect() as conn:
             result = conn.execute("SELECT * FROM pg_extension WHERE extname = 'timescaledb'")
             if result.fetchone():
-                logger.info("✅ TimescaleDB extension is active")
+                                   logger.info("TimescaleDB extension is active")
             else:
-                logger.warning("⚠️ TimescaleDB extension not found")
+                                   logger.warning("TimescaleDB extension not found")
                 
     except Exception as e:
-        logger.error(f"❌ Database initialization failed: {e}")
+                       logger.error(f"Database initialization failed: {e}")
         raise
 
 def check_db_health() -> bool:
@@ -88,7 +88,7 @@ def check_db_health() -> bool:
             conn.execute("SELECT 1")
         return True
     except Exception as e:
-        logger.error(f"❌ Database health check failed: {e}")
+                       logger.error(f"Database health check failed: {e}")
         return False
 
 def get_db_stats():
@@ -127,5 +127,5 @@ def get_db_stats():
             }
             
     except Exception as e:
-        logger.error(f"❌ Database stats collection failed: {e}")
+                       logger.error(f"Database stats collection failed: {e}")
         return {"status": "error", "message": str(e)} 

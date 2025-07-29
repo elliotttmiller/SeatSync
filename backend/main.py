@@ -12,9 +12,9 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
     host = os.getenv("HOST", "0.0.0.0")
     
-    print(f"🚀 Starting SeatSync Backend on {host}:{port}")
-    print(f"📊 Environment: {os.getenv('ENVIRONMENT', 'development')}")
-    print(f"🔗 API Documentation: http://{host}:{port}/docs")
+    print(f"Starting SeatSync Backend on {host}:{port}")
+    print(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
+    print(f"API Documentation: http://{host}:{port}/docs")
     
     # Start the FastAPI server
     uvicorn.run(
