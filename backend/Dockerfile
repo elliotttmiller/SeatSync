@@ -12,12 +12,11 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
         libpq-dev \
-    && pip install --no-cache-dir poetry \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy and install dependencies
-COPY pyproject.toml poetry.lock ./
-RUN poetry install --no-root --no-interaction --no-ansi
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy project files
 COPY . .
@@ -26,4 +25,4 @@ COPY . .
 EXPOSE 8000
 
 # Start the app with Poetry and Uvicorn, using $PORT
-CMD ["sh", "-c", "poetry run uvicorn app.main:app --host 0.0.0.0 --port $PORT"] 
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port $PORT"] 
