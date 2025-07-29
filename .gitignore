@@ -141,11 +141,11 @@ temp/
 *.sqlite3
 
 # ML Models
+# models/
 *.pkl
 *.joblib
 *.h5
 *.hdf5
-models/
 
 # Jupyter Notebook
 .ipynb_checkpoints
