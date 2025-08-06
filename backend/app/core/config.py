@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     NODE_ENV: str = "development"
     SECRET_KEY: str
     JWT_SECRET_KEY: str
+    ALGORITHM: str = "HS256"
     DATABASE_URL: str
     GOOGLE_PROJECT_ID: str
     GOOGLE_APPLICATION_CREDENTIALS: str
