@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SeatSync Dashboard</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: #1976d2;
+            color: white;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 30px;
+            border-radius: 8px;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        .metric {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .metric h3 {
+            margin: 0;
+            color: #666;
+            font-size: 14px;
+            font-weight: normal;
+        }
+        .metric .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin: 5px 0;
+        }
+        .positive {
+            color: #4caf50;
+        }
+        .negative {
+            color: #f44336;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .marketplace-account {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .status-active {
+            color: #4caf50;
+            font-weight: bold;
+        }
+        .status-inactive {
+            color: #f44336;
+            font-weight: bold;
+        }
+        .sync-button {
+            background: #1976d2;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 15px;
+        }
+        .sync-button:hover {
+            background: #1565c0;
+        }
+        .sync-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        th {
+            background: #f5f5f5;
+            font-weight: bold;
+        }
+        .phase-status {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 20px;
+        }
+        .phase-item {
+            text-align: center;
+        }
+        .phase-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        .phase-label {
+            font-size: 12px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎫 SeatSync Dashboard</h1>
+            <p>AI-Powered Sports Ticket Portfolio Management</p>
+        </div>
+
+        <!-- Portfolio Overview -->
+        <div class="card">
+            <h2>Portfolio Overview</h2>
+            <div id="portfolio-loading" class="loading">Loading portfolio data...</div>
+            <div id="portfolio-error" class="error" style="display: none;"></div>
+            <div id="portfolio-metrics" class="metrics-grid" style="display: none;"></div>
+        </div>
+
+        <!-- Market Trends -->
+        <div class="card">
+            <h2>Market Trends & Analysis</h2>
+            <div id="trends-loading" class="loading">Loading market trends...</div>
+            <div id="trends-error" class="error" style="display: none;"></div>
+            <div id="trends-content" style="display: none;">
+                <div class="metrics-grid">
+                    <div class="metric">
+                        <h3>Market Sentiment</h3>
+                        <div id="market-sentiment" class="value">-</div>
+                    </div>
+                    <div class="metric">
+                        <h3>Recent Activity</h3>
+                        <div id="recent-activity" class="value">-</div>
+                    </div>
+                </div>
+                <h3>Recent Price Trends</h3>
+                <table id="price-trends-table">
+                    <thead>
+                        <tr>
+                            <th>Game Date</th>
+                            <th>Average Price</th>
+                            <th>Listings</th>
+                        </tr>
+                    </thead>
+                    <tbody id="price-trends-body">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Marketplace Accounts -->
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>Marketplace Connections</h2>
+                <button id="sync-button" class="sync-button" onclick="syncMarketplaceData()">
+                    Sync All Platforms
+                </button>
+            </div>
+            <div id="accounts-loading" class="loading">Loading marketplace accounts...</div>
+            <div id="accounts-error" class="error" style="display: none;"></div>
+            <div id="accounts-content" style="display: none;">
+                <div id="accounts-list"></div>
+                <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 4px;">
+                    <h4 style="margin: 0 0 10px 0;">Platform Integration Status</h4>
+                    <p id="accounts-summary" style="margin: 0; font-size: 14px; color: #666;"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Phase Status -->
+        <div class="card" style="text-align: center; margin-top: 40px;">
+            <h3>🚀 Phase 1 Implementation Complete</h3>
+            <p>
+                Backend services have been hardened with real database queries, 
+                authentication system is operational, and marketplace integration 
+                foundation is in place. Ready for Phase 2 AI model development!
+            </p>
+            <div class="phase-status">
+                <div class="phase-item">
+                    <div class="phase-icon">✅</div>
+                    <div class="phase-label">Auth System</div>
+                </div>
+                <div class="phase-item">
+                    <div class="phase-icon">✅</div>
+                    <div class="phase-label">Analytics</div>
+                </div>
+                <div class="phase-item">
+                    <div class="phase-icon">✅</div>
+                    <div class="phase-label">Marketplace</div>
+                </div>
+                <div class="phase-item">
+                    <div class="phase-icon">⏳</div>
+                    <div class="phase-label">AI Models</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000/api/v1';
+
+        // Utility functions
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+            }).format(amount);
+        }
+
+        function formatDate(dateString) {
+            return new Date(dateString).toLocaleDateString();
+        }
+
+        function formatPercentage(value) {
+            return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+        }
+
+        function getPlatformIcon(platform) {
+            const platformMap = {
+                stubhub: '🎫',
+                seatgeek: '🪑',
+                ticketmaster: '🎭'
+            };
+            return platformMap[platform.toLowerCase()] || '🏟️';
+        }
+
+        // API calls
+        async function fetchPortfolioSummary() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/analytics/portfolio-summary`);
+                if (!response.ok) throw new Error('Failed to fetch portfolio summary');
+                const data = await response.json();
+                
+                // Calculate ROI
+                const totalRoi = data.total_cost_basis > 0 
+                    ? ((data.realized_pnl + data.unrealized_pnl) / data.total_cost_basis) * 100 
+                    : 0;
+
+                document.getElementById('portfolio-loading').style.display = 'none';
+                document.getElementById('portfolio-metrics').style.display = 'grid';
+                
+                document.getElementById('portfolio-metrics').innerHTML = `
+                    <div class="metric">
+                        <h3>Total Season Tickets</h3>
+                        <div class="value">${data.total_tickets}</div>
+                    </div>
+                    <div class="metric">
+                        <h3>Active Listings</h3>
+                        <div class="value">${data.active_listings}</div>
+                    </div>
+                    <div class="metric">
+                        <h3>Total Portfolio Value</h3>
+                        <div class="value">${formatCurrency(data.total_value)}</div>
+                    </div>
+                    <div class="metric">
+                        <h3>Monthly Revenue</h3>
+                        <div class="value">${formatCurrency(data.monthly_revenue)}</div>
+                    </div>
+                    <div class="metric">
+                        <h3>Cost Basis</h3>
+                        <div class="value">${formatCurrency(data.total_cost_basis)}</div>
+                    </div>
+                    <div class="metric">
+                        <h3>Realized P&L</h3>
+                        <div class="value ${data.realized_pnl >= 0 ? 'positive' : 'negative'}">
+                            ${formatCurrency(data.realized_pnl)}
+                        </div>
+                    </div>
+                    <div class="metric">
+                        <h3>Unrealized P&L</h3>
+                        <div class="value ${data.unrealized_pnl >= 0 ? 'positive' : 'negative'}">
+                            ${formatCurrency(data.unrealized_pnl)}
+                        </div>
+                    </div>
+                    <div class="metric">
+                        <h3>Total ROI</h3>
+                        <div class="value ${totalRoi >= 0 ? 'positive' : 'negative'}">
+                            ${formatPercentage(totalRoi)}
+                        </div>
+                    </div>
+                    <div class="metric">
+                        <h3>Tickets Sold</h3>
+                        <div class="value">${data.tickets_sold}</div>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('portfolio-loading').style.display = 'none';
+                document.getElementById('portfolio-error').style.display = 'block';
+                document.getElementById('portfolio-error').textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function fetchMarketTrends() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/analytics/market-trends`);
+                if (!response.ok) throw new Error('Failed to fetch market trends');
+                const data = await response.json();
+                
+                document.getElementById('trends-loading').style.display = 'none';
+                document.getElementById('trends-content').style.display = 'block';
+                
+                const sentimentClass = data.market_sentiment === 'bullish' ? 'positive' : 
+                                     data.market_sentiment === 'bearish' ? 'negative' : '';
+                
+                document.getElementById('market-sentiment').className = `value ${sentimentClass}`;
+                document.getElementById('market-sentiment').textContent = 
+                    data.market_sentiment.charAt(0).toUpperCase() + data.market_sentiment.slice(1);
+                
+                document.getElementById('recent-activity').textContent = `${data.recent_activity} listings`;
+                
+                // Price trends table
+                const tbody = document.getElementById('price-trends-body');
+                tbody.innerHTML = '';
+                data.price_trends.forEach(trend => {
+                    const row = tbody.insertRow();
+                    row.innerHTML = `
+                        <td>${formatDate(trend.date)}</td>
+                        <td>${formatCurrency(trend.avg_price)}</td>
+                        <td>${trend.listing_count}</td>
+                    `;
+                });
+                
+            } catch (error) {
+                document.getElementById('trends-loading').style.display = 'none';
+                document.getElementById('trends-error').style.display = 'block';
+                document.getElementById('trends-error').textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function fetchMarketplaceAccounts() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/marketplace/accounts`);
+                if (!response.ok) throw new Error('Failed to fetch marketplace accounts');
+                const data = await response.json();
+                
+                document.getElementById('accounts-loading').style.display = 'none';
+                document.getElementById('accounts-content').style.display = 'block';
+                
+                const accountsList = document.getElementById('accounts-list');
+                if (data.length === 0) {
+                    accountsList.innerHTML = '<div class="loading">No marketplace accounts connected.</div>';
+                } else {
+                    accountsList.innerHTML = data.map(account => `
+                        <div class="marketplace-account">
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <span style="font-size: 24px;">${getPlatformIcon(account.platform)}</span>
+                                <div>
+                                    <h3 style="margin: 0 0 5px 0;">
+                                        ${account.platform.charAt(0).toUpperCase() + account.platform.slice(1)}
+                                    </h3>
+                                    ${account.account_id ? `<p style="margin: 0; color: #666; font-size: 14px;">Account: ${account.account_id}</p>` : ''}
+                                    <p style="margin: 0; color: #666; font-size: 12px;">
+                                        Connected: ${formatDate(account.created_at)}
+                                    </p>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="${account.is_active ? 'status-active' : 'status-inactive'}">
+                                    ${account.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+                
+                const activeCount = data.filter(a => a.is_active).length;
+                document.getElementById('accounts-summary').textContent = 
+                    `${data.length} marketplace${data.length !== 1 ? 's' : ''} connected. ${activeCount} active platform${activeCount !== 1 ? 's' : ''}.`;
+                    
+            } catch (error) {
+                document.getElementById('accounts-loading').style.display = 'none';
+                document.getElementById('accounts-error').style.display = 'block';
+                document.getElementById('accounts-error').textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function syncMarketplaceData() {
+            const button = document.getElementById('sync-button');
+            button.disabled = true;
+            button.textContent = 'Syncing...';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/marketplace/sync`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+                if (!response.ok) throw new Error('Sync failed');
+                
+                alert('Marketplace sync completed successfully!');
+                fetchMarketplaceAccounts(); // Refresh accounts
+            } catch (error) {
+                alert(`Sync failed: ${error.message}`);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Sync All Platforms';
+            }
+        }
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchPortfolioSummary();
+            fetchMarketTrends();
+            fetchMarketplaceAccounts();
+        });
+    </script>
+</body>
+</html>

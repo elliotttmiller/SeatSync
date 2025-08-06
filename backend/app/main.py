@@ -15,7 +15,15 @@ from app.db.session import get_db
 from sqlalchemy import text
 
 # Set up logging
-logging.basicConfig(level=logging.DEBUG if settings.DEBUG else logging.INFO)
+log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
+logging.basicConfig(
+    level=log_level,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('/tmp/seatsync.log') if settings.DEBUG else logging.NullHandler()
+    ]
+)
 logger = logging.getLogger("seatsync")
 
 class LoggingMiddleware(BaseHTTPMiddleware):
