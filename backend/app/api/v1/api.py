@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from app.api.v1.endpoints import auth, users, tickets, listings, analytics, marketplace
-from app.api.v1.endpoints import refresh, predict, chat, automation
+from app.api.v1.endpoints import refresh, predict, chat, automation, intelligence
 
 api_router = APIRouter()
 
@@ -14,4 +14,5 @@ api_router.include_router(marketplace.router, prefix="/marketplace", tags=["mark
 api_router.include_router(refresh.router, prefix="/auth", tags=["auth"])
 api_router.include_router(predict.router, tags=["ai"])
 api_router.include_router(chat.router, tags=["ai"])
-api_router.include_router(automation.router, prefix="/automation", tags=["automation", "ai"]) 
+api_router.include_router(automation.router, prefix="/automation", tags=["automation", "ai"])
+api_router.include_router(intelligence.router, prefix="/intelligence", tags=["ai", "advanced"]) 

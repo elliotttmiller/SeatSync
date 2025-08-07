@@ -35,6 +35,7 @@ class SeasonTicket(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
     team = Column(String, nullable=False, index=True)
+    team_name = Column(String, nullable=False)  # Added for better query consistency
     league = Column(String, nullable=False)
     venue = Column(String, nullable=False)
     section = Column(String, nullable=False)
@@ -77,10 +78,13 @@ class Listing(Base):
     platform = Column(String, nullable=False)
     listing_id = Column(String)  # External platform listing ID
     price = Column(DECIMAL(10, 2), nullable=False)
+    section = Column(String)  # Added for easier querying
+    row = Column(String)      # Added for easier querying
     status = Column(String, default='active', index=True)  # 'active', 'sold', 'cancelled', 'expired'
     original_price = Column(DECIMAL(10, 2))
     final_price = Column(DECIMAL(10, 2))
     sold_at = Column(DateTime)
+    listed_date = Column(DateTime, default=func.now())  # Added for listing age calculations
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     
