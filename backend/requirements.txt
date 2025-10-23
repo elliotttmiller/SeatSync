@@ -27,4 +27,8 @@ torch>=2.0.0
 # SciPy for portfolio optimization
 scipy>=1.10.0
 # Additional data processing
-aiohttp>=3.8.0 
+aiohttp>=3.8.0
+# Advanced web scraping
+playwright>=1.40.0
+beautifulsoup4>=4.12.0
+lxml>=5.0.0 

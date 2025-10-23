@@ -1,16 +1,23 @@
 """
-Advanced Data Ingestion Pipeline for SeatSync Phase 1
-AI Foundation & Data Pipeline Implementation
+Advanced Data Ingestion Pipeline for SeatSync
+Ticket Price Scraping & Collection Focus
 
-This service provides comprehensive data acquisition and processing capabilities including:
-- Real-time marketplace data collection
-- Sports data integration
-- External context data (weather, news, social media)
+This service provides sophisticated web scraping capabilities for real-time
+ticket price collection from major marketplaces without relying on APIs.
+
+Primary Focus:
+- Advanced web scraping from ticket marketplaces
+- Real-time price data collection and normalization
+- Intelligent scraping with anti-bot detection bypassing
 - High-frequency data ingestion and processing
+
+Secondary (Minimal):
+- Basic context data for predictions (optional)
 """
 
 import asyncio
 import logging
+import os
 from typing import Dict, List, Optional, Any, AsyncGenerator
 from datetime import datetime, timedelta
 import json
@@ -25,73 +32,88 @@ from app.models.database import MarketData, SentimentData, SeasonTicket, Listing
 logger = logging.getLogger(__name__)
 
 class AdvancedDataPipeline:
-    """High-performance data ingestion and processing pipeline"""
+    """
+    High-performance data ingestion pipeline focused on ticket price scraping
+    
+    Uses advanced web scraping techniques to collect real-time ticket prices
+    from all major marketplaces without relying on public APIs.
+    """
     
     def __init__(self):
+        # Initialize advanced web scraper (lazy loading)
+        self._advanced_scraper = None
+        
+        # Keep minimal API-based scrapers as fallback (deprecated in favor of web scraping)
         self.marketplace_scrapers = {
             'stubhub': StubHubScraper(),
             'seatgeek': SeatGeekScraper(),
             'ticketmaster': TicketmasterScraper(),
             'vivid_seats': VividSeatsScraper()
         }
-        self.sports_apis = {
-            'sportradar': SportradarAPI(),
-            'espn': ESPNAPI(),
-            'nba': NBAAPI(),
-            'nfl': NFLAPI(),
-            'mlb': MLBAPI()
-        }
-        self.sentiment_analyzers = {
-            'twitter': TwitterSentimentAnalyzer(),
-            'reddit': RedditSentimentAnalyzer(),
-            'news': NewsAnalyzer()
-        }
+        
+        # Feature engineers for processing scraped data
         self.feature_engineers = {
             'market': MarketFeatureEngineer(),
-            'team': TeamFeatureEngineer(),
             'temporal': TemporalFeatureEngineer(),
             'external': ExternalFeatureEngineer()
         }
+    
+    async def get_advanced_scraper(self):
+        """Get or initialize the advanced web scraper"""
+        if self._advanced_scraper is None:
+            try:
+                from app.services.advanced_ticket_scraper import get_advanced_scraper
+                self._advanced_scraper = await get_advanced_scraper()
+            except Exception as e:
+                logger.warning(f"Advanced scraper not available: {e}")
+                self._advanced_scraper = None
+        return self._advanced_scraper
         
     async def real_time_data_stream(self, db: AsyncSession) -> AsyncGenerator[Dict[str, Any], None]:
         """
-        High-frequency data ingestion with parallel collection
+        High-frequency data ingestion with focus on ticket price scraping
         Yields processed data in real-time for immediate use
         """
         while True:
             try:
-                # Parallel data collection from multiple sources
-                tasks = [
-                    self._collect_marketplace_data(),
-                    self._collect_sports_data(),
-                    self._collect_sentiment_data(),
-                    self._collect_external_context()
-                ]
+                # PRIMARY: Advanced web scraping from marketplaces
+                primary_task = self._collect_marketplace_data_advanced()
                 
-                # Execute all data collection tasks concurrently
-                results = await asyncio.gather(*tasks, return_exceptions=True)
+                # SECONDARY: Minimal context data (optional)
+                # Only collect if needed for predictions
+                secondary_tasks = []
+                if getattr(settings, 'ENABLE_CONTEXT_DATA', False):
+                    secondary_tasks.append(self._collect_minimal_context())
                 
-                # Process and yield data
-                for result in results:
-                    if not isinstance(result, Exception) and result:
-                        # Real-time feature engineering
-                        features = await self._engineer_features(result)
-                        
-                        # Store in TimescaleDB with bulk inserts
-                        await self._bulk_insert_data(db, features)
-                        
-                        yield {
-                            'timestamp': datetime.utcnow().isoformat(),
-                            'data_type': result.get('type', 'unknown'),
-                            'features': features,
-                            'status': 'processed'
-                        }
+                # Execute primary scraping task
+                primary_result = await primary_task
                 
-                # Cache invalidation strategies
-                await self._invalidate_stale_cache()
+                # Process and yield primary data
+                if primary_result and not isinstance(primary_result, Exception):
+                    # Real-time feature engineering focused on price data
+                    features = await self._engineer_features(primary_result)
+                    
+                    # Store in database
+                    await self._bulk_insert_data(db, features)
+                    
+                    yield {
+                        'timestamp': datetime.utcnow().isoformat(),
+                        'data_type': 'marketplace_scraped',
+                        'features': features,
+                        'status': 'processed',
+                        'listings_count': len(primary_result.get('listings', []))
+                    }
                 
-                # Sleep before next iteration (configurable)
-                await asyncio.sleep(getattr(settings, 'DATA_COLLECTION_INTERVAL', 30))
+                # Process secondary data if available
+                if secondary_tasks:
+                    secondary_results = await asyncio.gather(*secondary_tasks, return_exceptions=True)
+                    for result in secondary_results:
+                        if result and not isinstance(result, Exception):
+                            features = await self._engineer_features(result)
+                            await self._bulk_insert_data(db, features)
+                
+                # Sleep before next scraping iteration
+                await asyncio.sleep(getattr(settings, 'SCRAPING_INTERVAL', 60))
                 
             except Exception as e:
                 logger.error(f"Error in data stream: {e}")
@@ -100,10 +122,47 @@ class AdvancedDataPipeline:
                     'error': str(e),
                     'status': 'error'
                 }
-                await asyncio.sleep(60)  # Wait longer on error
+                await asyncio.sleep(120)  # Wait longer on error
     
-    async def _collect_marketplace_data(self) -> Dict[str, Any]:
-        """Collect data from all marketplace APIs in parallel"""
+    async def _collect_marketplace_data_advanced(self) -> Dict[str, Any]:
+        """
+        PRIMARY DATA COLLECTION: Advanced web scraping from all marketplaces
+        
+        Uses sophisticated scraping techniques to extract real-time ticket prices
+        from marketplace websites without relying on APIs.
+        """
+        try:
+            # Try to use advanced Playwright-based scraper first
+            advanced_scraper = await self.get_advanced_scraper()
+            
+            if advanced_scraper:
+                logger.info("Using advanced web scraper for marketplace data")
+                
+                # Scrape all marketplaces
+                result = await advanced_scraper.scrape_all_marketplaces(
+                    search_query=getattr(settings, 'DEFAULT_SEARCH_QUERY', 'sports')
+                )
+                
+                return {
+                    'type': 'marketplace',
+                    'method': 'advanced_scraping',
+                    'timestamp': datetime.utcnow(),
+                    'platforms': result.get('platforms', {}),
+                    'listings': result.get('listings', []),
+                    'total_count': result.get('total_listings', 0)
+                }
+            else:
+                # Fallback to API-based scrapers (legacy)
+                logger.info("Advanced scraper not available, using fallback API scrapers")
+                return await self._collect_marketplace_data_fallback()
+                
+        except Exception as e:
+            logger.error(f"Advanced marketplace scraping error: {e}")
+            # Try fallback
+            return await self._collect_marketplace_data_fallback()
+    
+    async def _collect_marketplace_data_fallback(self) -> Dict[str, Any]:
+        """Fallback: Use API-based scrapers if advanced scraping fails"""
         try:
             tasks = []
             for platform, scraper in self.marketplace_scrapers.items():
@@ -114,6 +173,7 @@ class AdvancedDataPipeline:
             
             marketplace_data = {
                 'type': 'marketplace',
+                'method': 'api_fallback',
                 'timestamp': datetime.utcnow(),
                 'platforms': {}
             }
@@ -125,72 +185,35 @@ class AdvancedDataPipeline:
             return marketplace_data
             
         except Exception as e:
-            logger.error(f"Marketplace data collection error: {e}")
+            logger.error(f"Marketplace fallback collection error: {e}")
             return {'type': 'marketplace', 'error': str(e)}
     
-    async def _collect_sports_data(self) -> Dict[str, Any]:
-        """Collect comprehensive sports data from multiple APIs"""
-        try:
-            sports_data = {
-                'type': 'sports',
-                'timestamp': datetime.utcnow(),
-                'leagues': {}
-            }
-            
-            # Collect data for each league
-            for league in ['NBA', 'NFL', 'MLB', 'NHL']:
-                league_data = await self._collect_league_data(league.lower())
-                if league_data:
-                    sports_data['leagues'][league] = league_data
-            
-            return sports_data
-            
-        except Exception as e:
-            logger.error(f"Sports data collection error: {e}")
-            return {'type': 'sports', 'error': str(e)}
-    
-    async def _collect_sentiment_data(self) -> Dict[str, Any]:
-        """Collect and analyze sentiment from multiple sources"""
-        try:
-            sentiment_data = {
-                'type': 'sentiment',
-                'timestamp': datetime.utcnow(),
-                'sources': {}
-            }
-            
-            # Collect sentiment from each source
-            for source, analyzer in self.sentiment_analyzers.items():
-                if analyzer.is_enabled():
-                    source_sentiment = await analyzer.collect_sentiment()
-                    if source_sentiment:
-                        sentiment_data['sources'][source] = source_sentiment
-            
-            return sentiment_data
-            
-        except Exception as e:
-            logger.error(f"Sentiment data collection error: {e}")
-            return {'type': 'sentiment', 'error': str(e)}
-    
-    async def _collect_external_context(self) -> Dict[str, Any]:
-        """Collect external context data (weather, events, etc.)"""
+    async def _collect_minimal_context(self) -> Dict[str, Any]:
+        """
+        SECONDARY: Collect minimal context data for predictions
+        
+        Only basic data needed to enhance price predictions.
+        NOT focused on team stats or detailed sports data.
+        """
         try:
             context_data = {
-                'type': 'external',
+                'type': 'context',
                 'timestamp': datetime.utcnow(),
-                'weather': await self._get_weather_data(),
-                'events': await self._get_competing_events(),
-                'news': await self._get_relevant_news(),
-                'market_indicators': await self._get_market_indicators()
+                'data': {}
             }
+            
+            # Only collect what's absolutely necessary for price prediction
+            # - Basic event timing info
+            # - Minimal external factors
             
             return context_data
             
         except Exception as e:
-            logger.error(f"External context collection error: {e}")
-            return {'type': 'external', 'error': str(e)}
+            logger.error(f"Context data collection error: {e}")
+            return {'type': 'context', 'error': str(e)}
     
     async def _engineer_features(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Apply feature engineering to raw data"""
+        """Apply feature engineering to raw data focused on marketplace prices"""
         try:
             features = {}
             data_type = raw_data.get('type', 'unknown')
@@ -198,9 +221,7 @@ class AdvancedDataPipeline:
             # Apply appropriate feature engineering based on data type
             if data_type == 'marketplace':
                 features.update(await self.feature_engineers['market'].process(raw_data))
-            elif data_type == 'sports':
-                features.update(await self.feature_engineers['team'].process(raw_data))
-            elif data_type in ['sentiment', 'external']:
+            elif data_type in ['context', 'external']:
                 features.update(await self.feature_engineers['external'].process(raw_data))
             
             # Always apply temporal features
@@ -240,32 +261,6 @@ class AdvancedDataPipeline:
         """Invalidate stale cache entries"""
         # Implement cache invalidation logic
         pass
-    
-    async def _collect_league_data(self, league: str) -> Dict[str, Any]:
-        """Collect data for a specific league"""
-        if league in self.sports_apis:
-            return await self.sports_apis[league].get_current_data()
-        return {}
-    
-    async def _get_weather_data(self) -> Dict[str, Any]:
-        """Get weather data for relevant venues"""
-        # Implement weather API integration
-        return {}
-    
-    async def _get_competing_events(self) -> Dict[str, Any]:
-        """Get competing events that might affect demand"""
-        # Implement events API integration
-        return {}
-    
-    async def _get_relevant_news(self) -> Dict[str, Any]:
-        """Get relevant news articles"""
-        # Implement news API integration
-        return {}
-    
-    async def _get_market_indicators(self) -> Dict[str, Any]:
-        """Get relevant market indicators"""
-        # Implement market data integration
-        return {}
 
 
 class BaseScraper:
@@ -284,69 +279,428 @@ class BaseScraper:
 
 
 class StubHubScraper(BaseScraper):
-    """StubHub API integration"""
+    """
+    StubHub API integration for real-time ticket data collection
+    Uses StubHub's Discovery API for event and listing data
+    """
+    
+    def __init__(self):
+        super().__init__()
+        self.api_key = os.getenv('STUBHUB_API_KEY', '')
+        self.base_url = 'https://api.stubhub.com/catalog/events/v3'
+        self.enabled = bool(self.api_key)
     
     async def collect_listings(self) -> Dict[str, Any]:
+        """
+        Collect real-time ticket listings from StubHub
+        Returns event data with pricing information
+        """
         try:
-            # Implement StubHub API calls
-            async with httpx.AsyncClient() as client:
-                # Mock implementation - replace with actual API calls
+            if not self.enabled:
+                logger.info("StubHub scraper not enabled - API key not configured")
                 return {
                     'platform': 'stubhub',
                     'listings': [],
-                    'timestamp': datetime.utcnow()
+                    'timestamp': datetime.utcnow(),
+                    'status': 'disabled'
                 }
+            
+            async with httpx.AsyncClient() as client:
+                headers = {
+                    'Authorization': f'Bearer {self.api_key}',
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+                
+                # Search for events (e.g., NBA, NFL, MLB games)
+                params = {
+                    'categoryName': 'Sports',
+                    'status': 'active',
+                    'rows': 100  # Get up to 100 events
+                }
+                
+                response = await client.get(
+                    self.base_url,
+                    headers=headers,
+                    params=params,
+                    timeout=30.0
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    # Extract listings from events
+                    listings = []
+                    events = data.get('events', [])
+                    
+                    for event in events:
+                        # Get ticket listings for each event
+                        event_listings = await self._get_event_listings(
+                            client, headers, event.get('id')
+                        )
+                        listings.extend(event_listings)
+                    
+                    logger.info(f"StubHub: Collected {len(listings)} listings from {len(events)} events")
+                    
+                    return {
+                        'platform': 'stubhub',
+                        'listings': listings,
+                        'event_count': len(events),
+                        'timestamp': datetime.utcnow(),
+                        'status': 'success'
+                    }
+                else:
+                    logger.warning(f"StubHub API returned status {response.status_code}")
+                    return {
+                        'platform': 'stubhub',
+                        'listings': [],
+                        'timestamp': datetime.utcnow(),
+                        'status': 'api_error',
+                        'error_code': response.status_code
+                    }
+                    
         except Exception as e:
             logger.error(f"StubHub scraper error: {e}")
-            return {}
+            return {
+                'platform': 'stubhub',
+                'listings': [],
+                'timestamp': datetime.utcnow(),
+                'status': 'error',
+                'error': str(e)
+            }
+    
+    async def _get_event_listings(
+        self, 
+        client: httpx.AsyncClient, 
+        headers: Dict[str, str], 
+        event_id: str
+    ) -> List[Dict[str, Any]]:
+        """Get ticket listings for a specific event"""
+        try:
+            # StubHub inventory API endpoint
+            inventory_url = f'https://api.stubhub.com/search/inventory/v2'
+            
+            params = {'eventid': event_id}
+            
+            response = await client.get(
+                inventory_url,
+                headers=headers,
+                params=params,
+                timeout=15.0
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                listings = data.get('listing', [])
+                
+                # Parse and normalize listing data
+                normalized_listings = []
+                for listing in listings:
+                    normalized_listings.append({
+                        'event_id': event_id,
+                        'listing_id': listing.get('listingId'),
+                        'section': listing.get('sectionName'),
+                        'row': listing.get('row'),
+                        'quantity': listing.get('quantity'),
+                        'price': float(listing.get('currentPrice', {}).get('amount', 0)),
+                        'currency': listing.get('currentPrice', {}).get('currency', 'USD'),
+                        'delivery_type': listing.get('deliveryTypeList', []),
+                        'timestamp': datetime.utcnow().isoformat()
+                    })
+                
+                return normalized_listings
+            else:
+                logger.debug(f"Failed to get listings for event {event_id}: {response.status_code}")
+                return []
+                
+        except Exception as e:
+            logger.debug(f"Error getting event listings: {e}")
+            return []
 
 
 class SeatGeekScraper(BaseScraper):
-    """SeatGeek API integration"""
+    """
+    SeatGeek API integration for real-time ticket data collection
+    Uses SeatGeek's public API for event and pricing data
+    """
+    
+    def __init__(self):
+        super().__init__()
+        self.client_id = os.getenv('SEATGEEK_CLIENT_ID', '')
+        self.client_secret = os.getenv('SEATGEEK_CLIENT_SECRET', '')
+        self.base_url = 'https://api.seatgeek.com/2'
+        self.enabled = bool(self.client_id)
     
     async def collect_listings(self) -> Dict[str, Any]:
+        """
+        Collect real-time ticket listings from SeatGeek
+        Returns event data with comprehensive pricing information
+        """
         try:
-            # Implement SeatGeek API calls
+            if not self.enabled:
+                logger.info("SeatGeek scraper not enabled - API credentials not configured")
+                return {
+                    'platform': 'seatgeek',
+                    'listings': [],
+                    'timestamp': datetime.utcnow(),
+                    'status': 'disabled'
+                }
+            
+            async with httpx.AsyncClient() as client:
+                # Search for sports events
+                params = {
+                    'client_id': self.client_id,
+                    'type': 'sports',  # Focus on sports events
+                    'per_page': 100,
+                    'datetime_utc.gte': datetime.utcnow().isoformat(),  # Future events
+                    'sort': 'datetime_utc.asc'
+                }
+                
+                response = await client.get(
+                    f'{self.base_url}/events',
+                    params=params,
+                    timeout=30.0
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    events = data.get('events', [])
+                    
+                    # Parse listings from events
+                    listings = []
+                    for event in events:
+                        listing = self._parse_seatgeek_event(event)
+                        if listing:
+                            listings.append(listing)
+                    
+                    logger.info(f"SeatGeek: Collected {len(listings)} listings from {len(events)} events")
+                    
+                    return {
+                        'platform': 'seatgeek',
+                        'listings': listings,
+                        'event_count': len(events),
+                        'timestamp': datetime.utcnow(),
+                        'status': 'success',
+                        'meta': data.get('meta', {})
+                    }
+                else:
+                    logger.warning(f"SeatGeek API returned status {response.status_code}")
+                    return {
+                        'platform': 'seatgeek',
+                        'listings': [],
+                        'timestamp': datetime.utcnow(),
+                        'status': 'api_error',
+                        'error_code': response.status_code
+                    }
+                    
+        except Exception as e:
+            logger.error(f"SeatGeek scraper error: {e}")
             return {
                 'platform': 'seatgeek',
                 'listings': [],
-                'timestamp': datetime.utcnow()
+                'timestamp': datetime.utcnow(),
+                'status': 'error',
+                'error': str(e)
+            }
+    
+    def _parse_seatgeek_event(self, event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Parse a SeatGeek event into normalized listing format"""
+        try:
+            stats = event.get('stats', {})
+            
+            return {
+                'event_id': event.get('id'),
+                'title': event.get('title'),
+                'datetime': event.get('datetime_utc'),
+                'venue': event.get('venue', {}).get('name'),
+                'city': event.get('venue', {}).get('city'),
+                'state': event.get('venue', {}).get('state'),
+                'performers': [p.get('name') for p in event.get('performers', [])],
+                'price_lowest': float(stats.get('lowest_price', 0)),
+                'price_average': float(stats.get('average_price', 0)),
+                'price_highest': float(stats.get('highest_price', 0)),
+                'listing_count': int(stats.get('listing_count', 0)),
+                'median_price': float(stats.get('median_price', 0)),
+                'score': float(event.get('score', 0)),
+                'popularity': float(event.get('popularity', 0)),
+                'timestamp': datetime.utcnow().isoformat(),
+                'url': event.get('url')
             }
         except Exception as e:
-            logger.error(f"SeatGeek scraper error: {e}")
-            return {}
+            logger.debug(f"Error parsing SeatGeek event: {e}")
+            return None
 
 
 class TicketmasterScraper(BaseScraper):
-    """Ticketmaster API integration"""
+    """
+    Ticketmaster API integration for real-time ticket data collection
+    Uses Ticketmaster's Discovery API for comprehensive event data
+    """
+    
+    def __init__(self):
+        super().__init__()
+        self.api_key = os.getenv('TICKETMASTER_API_KEY', '')
+        self.base_url = 'https://app.ticketmaster.com/discovery/v2'
+        self.enabled = bool(self.api_key)
     
     async def collect_listings(self) -> Dict[str, Any]:
+        """
+        Collect real-time event and pricing data from Ticketmaster
+        Returns comprehensive event information with pricing
+        """
         try:
-            # Implement Ticketmaster API calls
+            if not self.enabled:
+                logger.info("Ticketmaster scraper not enabled - API key not configured")
+                return {
+                    'platform': 'ticketmaster',
+                    'listings': [],
+                    'timestamp': datetime.utcnow(),
+                    'status': 'disabled'
+                }
+            
+            async with httpx.AsyncClient() as client:
+                # Search for sports events
+                params = {
+                    'apikey': self.api_key,
+                    'classificationName': 'Sports',
+                    'size': 100,
+                    'sort': 'date,asc'
+                }
+                
+                response = await client.get(
+                    f'{self.base_url}/events.json',
+                    params=params,
+                    timeout=30.0
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    embedded = data.get('_embedded', {})
+                    events = embedded.get('events', [])
+                    
+                    # Parse events into listings
+                    listings = []
+                    for event in events:
+                        listing = self._parse_ticketmaster_event(event)
+                        if listing:
+                            listings.append(listing)
+                    
+                    logger.info(f"Ticketmaster: Collected {len(listings)} listings from {len(events)} events")
+                    
+                    return {
+                        'platform': 'ticketmaster',
+                        'listings': listings,
+                        'event_count': len(events),
+                        'timestamp': datetime.utcnow(),
+                        'status': 'success',
+                        'page': data.get('page', {})
+                    }
+                else:
+                    logger.warning(f"Ticketmaster API returned status {response.status_code}")
+                    return {
+                        'platform': 'ticketmaster',
+                        'listings': [],
+                        'timestamp': datetime.utcnow(),
+                        'status': 'api_error',
+                        'error_code': response.status_code
+                    }
+                    
+        except Exception as e:
+            logger.error(f"Ticketmaster scraper error: {e}")
             return {
                 'platform': 'ticketmaster',
                 'listings': [],
-                'timestamp': datetime.utcnow()
+                'timestamp': datetime.utcnow(),
+                'status': 'error',
+                'error': str(e)
+            }
+    
+    def _parse_ticketmaster_event(self, event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Parse a Ticketmaster event into normalized listing format"""
+        try:
+            # Extract pricing information
+            price_ranges = event.get('priceRanges', [{}])[0]
+            
+            # Extract venue information
+            venues = event.get('_embedded', {}).get('venues', [{}])
+            venue = venues[0] if venues else {}
+            
+            # Extract classification
+            classifications = event.get('classifications', [{}])
+            classification = classifications[0] if classifications else {}
+            
+            return {
+                'event_id': event.get('id'),
+                'name': event.get('name'),
+                'date': event.get('dates', {}).get('start', {}).get('dateTime'),
+                'venue_name': venue.get('name'),
+                'city': venue.get('city', {}).get('name'),
+                'state': venue.get('state', {}).get('stateCode'),
+                'country': venue.get('country', {}).get('countryCode'),
+                'sport': classification.get('segment', {}).get('name'),
+                'genre': classification.get('genre', {}).get('name'),
+                'price_min': float(price_ranges.get('min', 0)),
+                'price_max': float(price_ranges.get('max', 0)),
+                'currency': price_ranges.get('currency', 'USD'),
+                'status': event.get('dates', {}).get('status', {}).get('code'),
+                'sales_start': event.get('sales', {}).get('public', {}).get('startDateTime'),
+                'sales_end': event.get('sales', {}).get('public', {}).get('endDateTime'),
+                'timestamp': datetime.utcnow().isoformat(),
+                'url': event.get('url')
             }
         except Exception as e:
-            logger.error(f"Ticketmaster scraper error: {e}")
-            return {}
+            logger.debug(f"Error parsing Ticketmaster event: {e}")
+            return None
 
 
 class VividSeatsScraper(BaseScraper):
-    """Vivid Seats API integration"""
+    """
+    Vivid Seats scraping integration
+    Note: Vivid Seats doesn't have a public API, so this uses web scraping
+    """
+    
+    def __init__(self):
+        super().__init__()
+        self.base_url = 'https://www.vividseats.com'
+        self.enabled = os.getenv('ENABLE_VIVIDSEATS_SCRAPING', 'false').lower() == 'true'
     
     async def collect_listings(self) -> Dict[str, Any]:
+        """
+        Collect ticket listings from Vivid Seats
+        Uses web scraping as no public API is available
+        """
         try:
-            # Implement Vivid Seats API calls
+            if not self.enabled:
+                logger.info("Vivid Seats scraper not enabled")
+                return {
+                    'platform': 'vivid_seats',
+                    'listings': [],
+                    'timestamp': datetime.utcnow(),
+                    'status': 'disabled',
+                    'note': 'Web scraping requires explicit enablement'
+                }
+            
+            # For MVP, return placeholder
+            # In production, implement with Playwright/Selenium for JS-heavy site
+            logger.info("Vivid Seats: Placeholder implementation")
+            
             return {
                 'platform': 'vivid_seats',
                 'listings': [],
-                'timestamp': datetime.utcnow()
+                'timestamp': datetime.utcnow(),
+                'status': 'not_implemented',
+                'note': 'Requires browser automation (Playwright/Selenium) for full implementation'
             }
+            
         except Exception as e:
             logger.error(f"Vivid Seats scraper error: {e}")
-            return {}
+            return {
+                'platform': 'vivid_seats',
+                'listings': [],
+                'timestamp': datetime.utcnow(),
+                'status': 'error',
+                'error': str(e)
+            }
 
 
 class BaseAPI:
@@ -361,83 +715,364 @@ class BaseAPI:
 
 
 class SportradarAPI(BaseAPI):
-    """Sportradar API integration"""
+    """
+    Sportradar API integration for professional sports data
+    Provides comprehensive coverage of major sports leagues
+    """
+    
+    def __init__(self):
+        super().__init__()
+        self.api_key = os.getenv('SPORTRADAR_API_KEY', '')
+        self.base_url = 'https://api.sportradar.us'
+        self.enabled = bool(self.api_key)
     
     async def get_current_data(self) -> Dict[str, Any]:
+        """Get current sports data from Sportradar"""
         try:
-            # Implement Sportradar API calls
+            if not self.enabled:
+                logger.info("Sportradar API not enabled - API key not configured")
+                return {
+                    'source': 'sportradar',
+                    'data': {},
+                    'timestamp': datetime.utcnow(),
+                    'status': 'disabled'
+                }
+            
+            # Get data from multiple sports
+            data = {}
+            sports = ['nba', 'nfl', 'mlb', 'nhl']
+            
+            async with httpx.AsyncClient() as client:
+                for sport in sports:
+                    try:
+                        sport_data = await self._get_sport_data(client, sport)
+                        if sport_data:
+                            data[sport] = sport_data
+                    except Exception as e:
+                        logger.debug(f"Failed to get {sport} data: {e}")
+            
             return {
                 'source': 'sportradar',
-                'data': {},
-                'timestamp': datetime.utcnow()
+                'data': data,
+                'timestamp': datetime.utcnow(),
+                'status': 'success' if data else 'no_data'
             }
         except Exception as e:
             logger.error(f"Sportradar API error: {e}")
+            return {
+                'source': 'sportradar',
+                'data': {},
+                'timestamp': datetime.utcnow(),
+                'status': 'error',
+                'error': str(e)
+            }
+    
+    async def _get_sport_data(self, client: httpx.AsyncClient, sport: str) -> Dict[str, Any]:
+        """Get data for a specific sport"""
+        # Sportradar endpoints vary by sport
+        endpoints = {
+            'nba': f'{self.base_url}/nba/trial/v8/en/games/schedule.json',
+            'nfl': f'{self.base_url}/nfl/official/trial/v7/en/games/schedule.json',
+            'mlb': f'{self.base_url}/mlb/trial/v7/en/games/schedule.json',
+            'nhl': f'{self.base_url}/nhl/trial/v8/en/games/schedule.json'
+        }
+        
+        url = endpoints.get(sport)
+        if not url:
+            return {}
+        
+        params = {'api_key': self.api_key}
+        
+        response = await client.get(url, params=params, timeout=15.0)
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.debug(f"Sportradar {sport} API error: {response.status_code}")
             return {}
 
 
 class ESPNAPI(BaseAPI):
-    """ESPN API integration"""
+    """
+    ESPN API integration for sports scores and team data
+    Uses ESPN's public API (no key required for basic access)
+    """
+    
+    def __init__(self):
+        super().__init__()
+        self.base_url = 'https://site.api.espn.com/apis/site/v2/sports'
+        self.enabled = True  # Public API, always available
     
     async def get_current_data(self) -> Dict[str, Any]:
+        """Get current sports data from ESPN"""
         try:
-            # Implement ESPN API calls
+            data = {}
+            
+            # Sports endpoints in ESPN API
+            sports = {
+                'basketball/nba': 'nba',
+                'football/nfl': 'nfl',
+                'baseball/mlb': 'mlb',
+                'hockey/nhl': 'nhl'
+            }
+            
+            async with httpx.AsyncClient() as client:
+                for espn_path, sport_key in sports.items():
+                    try:
+                        sport_data = await self._get_sport_scoreboard(client, espn_path)
+                        if sport_data:
+                            data[sport_key] = sport_data
+                    except Exception as e:
+                        logger.debug(f"Failed to get ESPN {sport_key} data: {e}")
+            
+            logger.info(f"ESPN: Collected data for {len(data)} sports")
+            
             return {
                 'source': 'espn',
-                'data': {},
-                'timestamp': datetime.utcnow()
+                'data': data,
+                'timestamp': datetime.utcnow(),
+                'status': 'success' if data else 'no_data'
             }
         except Exception as e:
             logger.error(f"ESPN API error: {e}")
+            return {
+                'source': 'espn',
+                'data': {},
+                'timestamp': datetime.utcnow(),
+                'status': 'error',
+                'error': str(e)
+            }
+    
+    async def _get_sport_scoreboard(self, client: httpx.AsyncClient, sport_path: str) -> Dict[str, Any]:
+        """Get scoreboard data for a specific sport"""
+        try:
+            url = f'{self.base_url}/{sport_path}/scoreboard'
+            
+            response = await client.get(url, timeout=15.0)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Parse and normalize the data
+                events = data.get('events', [])
+                
+                return {
+                    'events': events,
+                    'leagues': data.get('leagues', []),
+                    'season': data.get('season', {}),
+                    'event_count': len(events)
+                }
+            else:
+                logger.debug(f"ESPN {sport_path} API error: {response.status_code}")
+                return {}
+                
+        except Exception as e:
+            logger.debug(f"Error getting ESPN scoreboard: {e}")
             return {}
 
 
 class NBAAPI(BaseAPI):
-    """NBA Official API integration"""
+    """
+    NBA Official API integration using balldontlie or NBA stats API
+    Provides detailed NBA statistics and game data
+    """
+    
+    def __init__(self):
+        super().__init__()
+        # Using balldontlie.io as it's free and doesn't require key
+        self.base_url = 'https://api.balldontlie.io/v1'
+        self.api_key = os.getenv('BALLDONTLIE_API_KEY', '')
+        self.enabled = True  # Free tier available
     
     async def get_current_data(self) -> Dict[str, Any]:
+        """Get current NBA data"""
         try:
-            # Implement NBA API calls
+            async with httpx.AsyncClient() as client:
+                headers = {}
+                if self.api_key:
+                    headers['Authorization'] = self.api_key
+                
+                # Get games
+                games_url = f'{self.base_url}/games'
+                params = {
+                    'per_page': 100,
+                    'start_date': datetime.utcnow().strftime('%Y-%m-%d')
+                }
+                
+                response = await client.get(
+                    games_url,
+                    headers=headers,
+                    params=params,
+                    timeout=15.0
+                )
+                
+                if response.status_code == 200:
+                    games_data = response.json()
+                    
+                    # Get teams data
+                    teams_url = f'{self.base_url}/teams'
+                    teams_response = await client.get(teams_url, headers=headers, timeout=15.0)
+                    teams_data = teams_response.json() if teams_response.status_code == 200 else {}
+                    
+                    logger.info(f"NBA: Collected {len(games_data.get('data', []))} games")
+                    
+                    return {
+                        'source': 'nba',
+                        'data': {
+                            'games': games_data.get('data', []),
+                            'teams': teams_data.get('data', []),
+                            'meta': games_data.get('meta', {})
+                        },
+                        'timestamp': datetime.utcnow(),
+                        'status': 'success'
+                    }
+                else:
+                    logger.debug(f"NBA API error: {response.status_code}")
+                    return {
+                        'source': 'nba',
+                        'data': {},
+                        'timestamp': datetime.utcnow(),
+                        'status': 'api_error',
+                        'error_code': response.status_code
+                    }
+                    
+        except Exception as e:
+            logger.error(f"NBA API error: {e}")
             return {
                 'source': 'nba',
                 'data': {},
-                'timestamp': datetime.utcnow()
+                'timestamp': datetime.utcnow(),
+                'status': 'error',
+                'error': str(e)
             }
-        except Exception as e:
-            logger.error(f"NBA API error: {e}")
-            return {}
 
 
 class NFLAPI(BaseAPI):
-    """NFL Official API integration"""
+    """
+    NFL data integration using TheSportsDB or ESPN
+    Provides NFL game schedules and team information
+    """
+    
+    def __init__(self):
+        super().__init__()
+        # Using TheSportsDB free API
+        self.base_url = 'https://www.thesportsdb.com/api/v1/json'
+        self.api_key = os.getenv('THESPORTSDB_API_KEY', '3')  # Free tier key
+        self.enabled = True
     
     async def get_current_data(self) -> Dict[str, Any]:
+        """Get current NFL data"""
         try:
-            # Implement NFL API calls
+            async with httpx.AsyncClient() as client:
+                # Get NFL events
+                events_url = f'{self.base_url}/{self.api_key}/eventsnextleague.php'
+                params = {'id': '4391'}  # NFL league ID
+                
+                response = await client.get(events_url, params=params, timeout=15.0)
+                
+                if response.status_code == 200:
+                    events_data = response.json()
+                    events = events_data.get('events', [])
+                    
+                    logger.info(f"NFL: Collected {len(events)} upcoming games")
+                    
+                    return {
+                        'source': 'nfl',
+                        'data': {
+                            'events': events,
+                            'event_count': len(events)
+                        },
+                        'timestamp': datetime.utcnow(),
+                        'status': 'success'
+                    }
+                else:
+                    logger.debug(f"NFL API error: {response.status_code}")
+                    return {
+                        'source': 'nfl',
+                        'data': {},
+                        'timestamp': datetime.utcnow(),
+                        'status': 'api_error'
+                    }
+                    
+        except Exception as e:
+            logger.error(f"NFL API error: {e}")
             return {
                 'source': 'nfl',
                 'data': {},
-                'timestamp': datetime.utcnow()
+                'timestamp': datetime.utcnow(),
+                'status': 'error',
+                'error': str(e)
             }
-        except Exception as e:
-            logger.error(f"NFL API error: {e}")
-            return {}
 
 
 class MLBAPI(BaseAPI):
-    """MLB Official API integration"""
+    """
+    MLB Official API integration
+    Provides comprehensive MLB game and statistics data
+    """
+    
+    def __init__(self):
+        super().__init__()
+        # MLB StatsAPI is free and public
+        self.base_url = 'https://statsapi.mlb.com/api/v1'
+        self.enabled = True
     
     async def get_current_data(self) -> Dict[str, Any]:
+        """Get current MLB data"""
         try:
-            # Implement MLB API calls
+            async with httpx.AsyncClient() as client:
+                # Get today's schedule
+                schedule_url = f'{self.base_url}/schedule'
+                params = {
+                    'sportId': 1,  # MLB
+                    'date': datetime.utcnow().strftime('%Y-%m-%d')
+                }
+                
+                response = await client.get(schedule_url, params=params, timeout=15.0)
+                
+                if response.status_code == 200:
+                    schedule_data = response.json()
+                    dates = schedule_data.get('dates', [])
+                    
+                    games = []
+                    for date_entry in dates:
+                        games.extend(date_entry.get('games', []))
+                    
+                    # Get teams
+                    teams_url = f'{self.base_url}/teams'
+                    teams_response = await client.get(teams_url, params={'sportId': 1}, timeout=15.0)
+                    teams_data = teams_response.json() if teams_response.status_code == 200 else {}
+                    
+                    logger.info(f"MLB: Collected {len(games)} games")
+                    
+                    return {
+                        'source': 'mlb',
+                        'data': {
+                            'games': games,
+                            'teams': teams_data.get('teams', []),
+                            'schedule': schedule_data
+                        },
+                        'timestamp': datetime.utcnow(),
+                        'status': 'success'
+                    }
+                else:
+                    logger.debug(f"MLB API error: {response.status_code}")
+                    return {
+                        'source': 'mlb',
+                        'data': {},
+                        'timestamp': datetime.utcnow(),
+                        'status': 'api_error'
+                    }
+                    
+        except Exception as e:
+            logger.error(f"MLB API error: {e}")
             return {
                 'source': 'mlb',
                 'data': {},
-                'timestamp': datetime.utcnow()
+                'timestamp': datetime.utcnow(),
+                'status': 'error',
+                'error': str(e)
             }
-        except Exception as e:
-            logger.error(f"MLB API error: {e}")
-            return {}
 
 
 class BaseSentimentAnalyzer:
@@ -499,4 +1134,152 @@ class NewsAnalyzer(BaseSentimentAnalyzer):
             }
         except Exception as e:
             logger.error(f"News sentiment error: {e}")
+            return {}
+
+
+class BaseFeatureEngineer:
+    """Base class for feature engineers"""
+    
+    async def process(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Override in subclasses"""
+        raise NotImplementedError
+
+
+class MarketFeatureEngineer(BaseFeatureEngineer):
+    """Market-based feature engineering"""
+    
+    async def process(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Process marketplace data into features"""
+        try:
+            features = {}
+            
+            if raw_data.get('type') != 'marketplace':
+                return features
+            
+            platforms = raw_data.get('platforms', {})
+            
+            # Calculate aggregate market features
+            all_listings = []
+            for platform, data in platforms.items():
+                listings = data.get('listings', [])
+                all_listings.extend(listings)
+            
+            if all_listings:
+                prices = [l.get('price', 0) for l in all_listings if l.get('price')]
+                if prices:
+                    features['market_avg_price'] = sum(prices) / len(prices)
+                    features['market_min_price'] = min(prices)
+                    features['market_max_price'] = max(prices)
+                    features['market_price_std'] = (sum((p - features['market_avg_price'])**2 for p in prices) / len(prices)) ** 0.5
+                    features['market_listing_count'] = len(all_listings)
+                    features['market_price_range'] = features['market_max_price'] - features['market_min_price']
+            
+            return features
+            
+        except Exception as e:
+            logger.error(f"Market feature engineering error: {e}")
+            return {}
+
+
+class TeamFeatureEngineer(BaseFeatureEngineer):
+    """Team and sports-based feature engineering"""
+    
+    async def process(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Process sports data into features"""
+        try:
+            features = {}
+            
+            if raw_data.get('type') != 'sports':
+                return features
+            
+            leagues = raw_data.get('leagues', {})
+            
+            # Process team performance data
+            for league, data in leagues.items():
+                league_data = data.get('data', {})
+                
+                # Extract team metrics
+                if 'team_stats' in league_data:
+                    features[f'{league.lower()}_team_rank'] = league_data['team_stats'].get('rank', 0)
+                    features[f'{league.lower()}_win_rate'] = league_data['team_stats'].get('win_rate', 0.5)
+                    features[f'{league.lower()}_recent_form'] = league_data['team_stats'].get('recent_form', 0)
+            
+            return features
+            
+        except Exception as e:
+            logger.error(f"Team feature engineering error: {e}")
+            return {}
+
+
+class TemporalFeatureEngineer(BaseFeatureEngineer):
+    """Time-based feature engineering"""
+    
+    async def process(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Process temporal features"""
+        try:
+            features = {}
+            
+            timestamp = raw_data.get('timestamp', datetime.utcnow())
+            if isinstance(timestamp, str):
+                timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            
+            # Extract temporal features
+            features['hour_of_day'] = timestamp.hour
+            features['day_of_week'] = timestamp.weekday()
+            features['day_of_month'] = timestamp.day
+            features['month'] = timestamp.month
+            features['is_weekend'] = 1 if timestamp.weekday() >= 5 else 0
+            features['is_business_hours'] = 1 if 9 <= timestamp.hour <= 17 else 0
+            
+            return features
+            
+        except Exception as e:
+            logger.error(f"Temporal feature engineering error: {e}")
+            return {}
+
+
+class ExternalFeatureEngineer(BaseFeatureEngineer):
+    """External context feature engineering"""
+    
+    async def process(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Process external context data into features"""
+        try:
+            features = {}
+            
+            data_type = raw_data.get('type')
+            
+            if data_type == 'sentiment':
+                # Process sentiment data
+                sources = raw_data.get('sources', {})
+                sentiments = []
+                for source, data in sources.items():
+                    sentiment_data = data.get('sentiment_data', {})
+                    if 'score' in sentiment_data:
+                        sentiments.append(sentiment_data['score'])
+                
+                if sentiments:
+                    features['avg_sentiment'] = sum(sentiments) / len(sentiments)
+                    features['sentiment_volatility'] = (sum((s - features['avg_sentiment'])**2 for s in sentiments) / len(sentiments)) ** 0.5
+            
+            elif data_type == 'external':
+                # Process weather data
+                weather = raw_data.get('weather', {})
+                if weather:
+                    features['weather_score'] = weather.get('score', 0.5)
+                    features['temperature'] = weather.get('temperature', 70)
+                
+                # Process competing events
+                events = raw_data.get('events', {})
+                if events:
+                    features['competing_events_count'] = events.get('count', 0)
+                
+                # Process news
+                news = raw_data.get('news', {})
+                if news:
+                    features['news_mentions'] = news.get('mentions', 0)
+            
+            return features
+            
+        except Exception as e:
+            logger.error(f"External feature engineering error: {e}")
             return {}
