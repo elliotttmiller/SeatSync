@@ -444,27 +444,18 @@ def run_scraping(marketplace: str, search_query: str) -> Dict[str, Any]:
                 'timestamp': datetime.now().isoformat()
             }
         
-        # Use actual scraping engine
+        # Use unified scraping service
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
         async def scrape():
-            from app.services.advanced_ticket_scraper import AdvancedTicketScraper
+            from app.services.scraping_service import scrape_tickets
             
-            scraper = AdvancedTicketScraper()
-            await scraper.initialize()
+            result = await scrape_tickets(
+                marketplace=marketplace,
+                search_query=search_query
+            )
             
-            if marketplace.lower() == 'stubhub':
-                result = await scraper.scrape_stubhub(search_query=search_query)
-            elif marketplace.lower() == 'seatgeek':
-                result = await scraper.scrape_seatgeek(search_query=search_query)
-            else:
-                result = {
-                    'status': 'error',
-                    'error': f'Unknown marketplace: {marketplace}'
-                }
-            
-            await scraper.cleanup()
             return result
         
         result = loop.run_until_complete(scrape())
