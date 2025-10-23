@@ -1,12 +1,18 @@
 """
-Advanced Data Ingestion Pipeline for SeatSync Phase 1
-AI Foundation & Data Pipeline Implementation
+Advanced Data Ingestion Pipeline for SeatSync
+Ticket Price Scraping & Collection Focus
 
-This service provides comprehensive data acquisition and processing capabilities including:
-- Real-time marketplace data collection
-- Sports data integration
-- External context data (weather, news, social media)
+This service provides sophisticated web scraping capabilities for real-time
+ticket price collection from major marketplaces without relying on APIs.
+
+Primary Focus:
+- Advanced web scraping from ticket marketplaces
+- Real-time price data collection and normalization
+- Intelligent scraping with anti-bot detection bypassing
 - High-frequency data ingestion and processing
+
+Secondary (Minimal):
+- Basic context data for predictions (optional)
 """
 
 import asyncio
@@ -26,73 +32,88 @@ from app.models.database import MarketData, SentimentData, SeasonTicket, Listing
 logger = logging.getLogger(__name__)
 
 class AdvancedDataPipeline:
-    """High-performance data ingestion and processing pipeline"""
+    """
+    High-performance data ingestion pipeline focused on ticket price scraping
+    
+    Uses advanced web scraping techniques to collect real-time ticket prices
+    from all major marketplaces without relying on public APIs.
+    """
     
     def __init__(self):
+        # Initialize advanced web scraper (lazy loading)
+        self._advanced_scraper = None
+        
+        # Keep minimal API-based scrapers as fallback (deprecated in favor of web scraping)
         self.marketplace_scrapers = {
             'stubhub': StubHubScraper(),
             'seatgeek': SeatGeekScraper(),
             'ticketmaster': TicketmasterScraper(),
             'vivid_seats': VividSeatsScraper()
         }
-        self.sports_apis = {
-            'sportradar': SportradarAPI(),
-            'espn': ESPNAPI(),
-            'nba': NBAAPI(),
-            'nfl': NFLAPI(),
-            'mlb': MLBAPI()
-        }
-        self.sentiment_analyzers = {
-            'twitter': TwitterSentimentAnalyzer(),
-            'reddit': RedditSentimentAnalyzer(),
-            'news': NewsAnalyzer()
-        }
+        
+        # Feature engineers for processing scraped data
         self.feature_engineers = {
             'market': MarketFeatureEngineer(),
-            'team': TeamFeatureEngineer(),
             'temporal': TemporalFeatureEngineer(),
             'external': ExternalFeatureEngineer()
         }
+    
+    async def get_advanced_scraper(self):
+        """Get or initialize the advanced web scraper"""
+        if self._advanced_scraper is None:
+            try:
+                from app.services.advanced_ticket_scraper import get_advanced_scraper
+                self._advanced_scraper = await get_advanced_scraper()
+            except Exception as e:
+                logger.warning(f"Advanced scraper not available: {e}")
+                self._advanced_scraper = None
+        return self._advanced_scraper
         
     async def real_time_data_stream(self, db: AsyncSession) -> AsyncGenerator[Dict[str, Any], None]:
         """
-        High-frequency data ingestion with parallel collection
+        High-frequency data ingestion with focus on ticket price scraping
         Yields processed data in real-time for immediate use
         """
         while True:
             try:
-                # Parallel data collection from multiple sources
-                tasks = [
-                    self._collect_marketplace_data(),
-                    self._collect_sports_data(),
-                    self._collect_sentiment_data(),
-                    self._collect_external_context()
-                ]
+                # PRIMARY: Advanced web scraping from marketplaces
+                primary_task = self._collect_marketplace_data_advanced()
                 
-                # Execute all data collection tasks concurrently
-                results = await asyncio.gather(*tasks, return_exceptions=True)
+                # SECONDARY: Minimal context data (optional)
+                # Only collect if needed for predictions
+                secondary_tasks = []
+                if getattr(settings, 'ENABLE_CONTEXT_DATA', False):
+                    secondary_tasks.append(self._collect_minimal_context())
                 
-                # Process and yield data
-                for result in results:
-                    if not isinstance(result, Exception) and result:
-                        # Real-time feature engineering
-                        features = await self._engineer_features(result)
-                        
-                        # Store in TimescaleDB with bulk inserts
-                        await self._bulk_insert_data(db, features)
-                        
-                        yield {
-                            'timestamp': datetime.utcnow().isoformat(),
-                            'data_type': result.get('type', 'unknown'),
-                            'features': features,
-                            'status': 'processed'
-                        }
+                # Execute primary scraping task
+                primary_result = await primary_task
                 
-                # Cache invalidation strategies
-                await self._invalidate_stale_cache()
+                # Process and yield primary data
+                if primary_result and not isinstance(primary_result, Exception):
+                    # Real-time feature engineering focused on price data
+                    features = await self._engineer_features(primary_result)
+                    
+                    # Store in database
+                    await self._bulk_insert_data(db, features)
+                    
+                    yield {
+                        'timestamp': datetime.utcnow().isoformat(),
+                        'data_type': 'marketplace_scraped',
+                        'features': features,
+                        'status': 'processed',
+                        'listings_count': len(primary_result.get('listings', []))
+                    }
                 
-                # Sleep before next iteration (configurable)
-                await asyncio.sleep(getattr(settings, 'DATA_COLLECTION_INTERVAL', 30))
+                # Process secondary data if available
+                if secondary_tasks:
+                    secondary_results = await asyncio.gather(*secondary_tasks, return_exceptions=True)
+                    for result in secondary_results:
+                        if result and not isinstance(result, Exception):
+                            features = await self._engineer_features(result)
+                            await self._bulk_insert_data(db, features)
+                
+                # Sleep before next scraping iteration
+                await asyncio.sleep(getattr(settings, 'SCRAPING_INTERVAL', 60))
                 
             except Exception as e:
                 logger.error(f"Error in data stream: {e}")
@@ -101,10 +122,47 @@ class AdvancedDataPipeline:
                     'error': str(e),
                     'status': 'error'
                 }
-                await asyncio.sleep(60)  # Wait longer on error
+                await asyncio.sleep(120)  # Wait longer on error
     
-    async def _collect_marketplace_data(self) -> Dict[str, Any]:
-        """Collect data from all marketplace APIs in parallel"""
+    async def _collect_marketplace_data_advanced(self) -> Dict[str, Any]:
+        """
+        PRIMARY DATA COLLECTION: Advanced web scraping from all marketplaces
+        
+        Uses sophisticated scraping techniques to extract real-time ticket prices
+        from marketplace websites without relying on APIs.
+        """
+        try:
+            # Try to use advanced Playwright-based scraper first
+            advanced_scraper = await self.get_advanced_scraper()
+            
+            if advanced_scraper:
+                logger.info("Using advanced web scraper for marketplace data")
+                
+                # Scrape all marketplaces
+                result = await advanced_scraper.scrape_all_marketplaces(
+                    search_query=getattr(settings, 'DEFAULT_SEARCH_QUERY', 'sports')
+                )
+                
+                return {
+                    'type': 'marketplace',
+                    'method': 'advanced_scraping',
+                    'timestamp': datetime.utcnow(),
+                    'platforms': result.get('platforms', {}),
+                    'listings': result.get('listings', []),
+                    'total_count': result.get('total_listings', 0)
+                }
+            else:
+                # Fallback to API-based scrapers (legacy)
+                logger.info("Advanced scraper not available, using fallback API scrapers")
+                return await self._collect_marketplace_data_fallback()
+                
+        except Exception as e:
+            logger.error(f"Advanced marketplace scraping error: {e}")
+            # Try fallback
+            return await self._collect_marketplace_data_fallback()
+    
+    async def _collect_marketplace_data_fallback(self) -> Dict[str, Any]:
+        """Fallback: Use API-based scrapers if advanced scraping fails"""
         try:
             tasks = []
             for platform, scraper in self.marketplace_scrapers.items():
@@ -115,6 +173,7 @@ class AdvancedDataPipeline:
             
             marketplace_data = {
                 'type': 'marketplace',
+                'method': 'api_fallback',
                 'timestamp': datetime.utcnow(),
                 'platforms': {}
             }
@@ -126,72 +185,35 @@ class AdvancedDataPipeline:
             return marketplace_data
             
         except Exception as e:
-            logger.error(f"Marketplace data collection error: {e}")
+            logger.error(f"Marketplace fallback collection error: {e}")
             return {'type': 'marketplace', 'error': str(e)}
     
-    async def _collect_sports_data(self) -> Dict[str, Any]:
-        """Collect comprehensive sports data from multiple APIs"""
-        try:
-            sports_data = {
-                'type': 'sports',
-                'timestamp': datetime.utcnow(),
-                'leagues': {}
-            }
-            
-            # Collect data for each league
-            for league in ['NBA', 'NFL', 'MLB', 'NHL']:
-                league_data = await self._collect_league_data(league.lower())
-                if league_data:
-                    sports_data['leagues'][league] = league_data
-            
-            return sports_data
-            
-        except Exception as e:
-            logger.error(f"Sports data collection error: {e}")
-            return {'type': 'sports', 'error': str(e)}
-    
-    async def _collect_sentiment_data(self) -> Dict[str, Any]:
-        """Collect and analyze sentiment from multiple sources"""
-        try:
-            sentiment_data = {
-                'type': 'sentiment',
-                'timestamp': datetime.utcnow(),
-                'sources': {}
-            }
-            
-            # Collect sentiment from each source
-            for source, analyzer in self.sentiment_analyzers.items():
-                if analyzer.is_enabled():
-                    source_sentiment = await analyzer.collect_sentiment()
-                    if source_sentiment:
-                        sentiment_data['sources'][source] = source_sentiment
-            
-            return sentiment_data
-            
-        except Exception as e:
-            logger.error(f"Sentiment data collection error: {e}")
-            return {'type': 'sentiment', 'error': str(e)}
-    
-    async def _collect_external_context(self) -> Dict[str, Any]:
-        """Collect external context data (weather, events, etc.)"""
+    async def _collect_minimal_context(self) -> Dict[str, Any]:
+        """
+        SECONDARY: Collect minimal context data for predictions
+        
+        Only basic data needed to enhance price predictions.
+        NOT focused on team stats or detailed sports data.
+        """
         try:
             context_data = {
-                'type': 'external',
+                'type': 'context',
                 'timestamp': datetime.utcnow(),
-                'weather': await self._get_weather_data(),
-                'events': await self._get_competing_events(),
-                'news': await self._get_relevant_news(),
-                'market_indicators': await self._get_market_indicators()
+                'data': {}
             }
+            
+            # Only collect what's absolutely necessary for price prediction
+            # - Basic event timing info
+            # - Minimal external factors
             
             return context_data
             
         except Exception as e:
-            logger.error(f"External context collection error: {e}")
-            return {'type': 'external', 'error': str(e)}
+            logger.error(f"Context data collection error: {e}")
+            return {'type': 'context', 'error': str(e)}
     
     async def _engineer_features(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Apply feature engineering to raw data"""
+        """Apply feature engineering to raw data focused on marketplace prices"""
         try:
             features = {}
             data_type = raw_data.get('type', 'unknown')
@@ -199,9 +221,7 @@ class AdvancedDataPipeline:
             # Apply appropriate feature engineering based on data type
             if data_type == 'marketplace':
                 features.update(await self.feature_engineers['market'].process(raw_data))
-            elif data_type == 'sports':
-                features.update(await self.feature_engineers['team'].process(raw_data))
-            elif data_type in ['sentiment', 'external']:
+            elif data_type in ['context', 'external']:
                 features.update(await self.feature_engineers['external'].process(raw_data))
             
             # Always apply temporal features
@@ -241,32 +261,6 @@ class AdvancedDataPipeline:
         """Invalidate stale cache entries"""
         # Implement cache invalidation logic
         pass
-    
-    async def _collect_league_data(self, league: str) -> Dict[str, Any]:
-        """Collect data for a specific league"""
-        if league in self.sports_apis:
-            return await self.sports_apis[league].get_current_data()
-        return {}
-    
-    async def _get_weather_data(self) -> Dict[str, Any]:
-        """Get weather data for relevant venues"""
-        # Implement weather API integration
-        return {}
-    
-    async def _get_competing_events(self) -> Dict[str, Any]:
-        """Get competing events that might affect demand"""
-        # Implement events API integration
-        return {}
-    
-    async def _get_relevant_news(self) -> Dict[str, Any]:
-        """Get relevant news articles"""
-        # Implement news API integration
-        return {}
-    
-    async def _get_market_indicators(self) -> Dict[str, Any]:
-        """Get relevant market indicators"""
-        # Implement market data integration
-        return {}
 
 
 class BaseScraper:
