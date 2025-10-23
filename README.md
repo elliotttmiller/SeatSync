@@ -3,6 +3,23 @@
 ## Overview
 SeatSync is an **advanced AI-driven platform** for ticket price prediction, market analysis, and automated trading strategies. Powered by cutting-edge ML ensemble models, real-time data collection from 11+ sources, and universal AI model support.
 
+## 🎉 Recent Improvements (v2.0)
+
+### Scraping System Overhaul
+- **Unified API** - Single entry point for all scraping operations
+- **Automatic Fallbacks** - Graceful degradation from Playwright to HTTP
+- **Better Error Handling** - Clear messages with actionable solutions
+- **Type Safety** - Fixed all import-time errors
+- **Windows Support** - Automatic asyncio policy configuration
+- **Comprehensive Tests** - 7/7 passing unit tests
+
+See [SCRAPING_GUIDE.md](./SCRAPING_GUIDE.md) for complete documentation.
+
+### Streamlit Integration
+- **Modern API** - Updated to latest Streamlit conventions
+- **Better UX** - Improved error messages and feedback
+- **Simplified Workflow** - Reduced complexity for common tasks
+
 ## 🚀 Key Features
 
 ### 🎯 Core Capabilities

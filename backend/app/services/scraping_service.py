@@ -8,14 +8,26 @@ This service:
 - Handles initialization automatically
 - Manages resource cleanup
 - Provides consistent error handling
+- Handles Windows-specific asyncio issues
 """
 
 import logging
+import sys
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 import asyncio
 
 logger = logging.getLogger(__name__)
+
+
+# Fix Windows asyncio issue with Playwright
+if sys.platform == 'win32':
+    try:
+        # Set event loop policy for Windows
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+        logger.info("Windows asyncio policy set for Playwright compatibility")
+    except Exception as e:
+        logger.warning(f"Could not set Windows asyncio policy: {e}")
 
 
 class ScrapingService:

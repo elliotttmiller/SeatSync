@@ -172,6 +172,37 @@ pip install playwright
 playwright install chromium
 ```
 
+### Windows: NotImplementedError with asyncio
+
+On Windows, you may see:
+```
+NotImplementedError
+  File "asyncio\base_events.py", line 503, in _make_subprocess_transport
+    raise NotImplementedError
+```
+
+**Solution:** This is a known Windows issue with Playwright. Use one of these workarounds:
+
+1. **Use Windows Subsystem for Linux (WSL)** - Recommended
+   ```bash
+   wsl --install
+   # Then run SeatSync in WSL
+   ```
+
+2. **Use Docker** - Alternative solution
+   ```bash
+   docker-compose up
+   ```
+
+3. **Set event loop policy** - Add to your script before running:
+   ```python
+   import asyncio
+   import sys
+   
+   if sys.platform == 'win32':
+       asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+   ```
+
 ### Streamlit Deprecation Warnings
 
 These have been fixed in the latest version. If you see them, update:
