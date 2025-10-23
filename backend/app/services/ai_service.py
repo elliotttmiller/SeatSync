@@ -15,8 +15,6 @@ from datetime import datetime, timedelta
 import json
 import re
 
-# Use existing google-genai package instead of google-generativeai
-import google.genai as genai
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, desc, text
@@ -32,6 +30,7 @@ from app.services.data_ingestion import AdvancedDataPipeline
 from app.services.feature_engineering import FeatureEngineering
 from app.services.ensemble_models import EnsemblePricingModel
 from app.services.trading_algorithms import AdvancedTradingEngine
+from app.services.universal_ai_loader import get_universal_loader
 
 logger = logging.getLogger(__name__)
 
@@ -39,13 +38,13 @@ class AIService:
     """Comprehensive AI service for SeatSync Phase 2+ capabilities"""
     
     def __init__(self):
-        # Configure Gemini AI using the existing google-genai package
+        # Initialize Universal AI Loader for multi-provider support
         try:
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-            self.client = genai.Client(api_key=settings.GEMINI_API_KEY)
+            self.ai_loader = get_universal_loader()
+            logger.info(f"Universal AI Loader initialized with {len(self.ai_loader.get_available_models())} models")
         except Exception as e:
-            logger.warning(f"Could not configure Gemini AI: {e}")
-            self.client = None
+            logger.warning(f"Could not initialize Universal AI Loader: {e}")
+            self.ai_loader = None
         
         # Initialize advanced AI components
         self.data_pipeline = AdvancedDataPipeline()
@@ -741,30 +740,24 @@ Consider factors like:
 """
 
     async def _generate_ai_response(self, prompt: str) -> str:
-        """Generate AI response using Gemini via HTTP API"""
+        """Generate AI response using Universal AI Loader with automatic fallback"""
         try:
-            if not settings.GEMINI_API_KEY:
+            if not self.ai_loader:
                 return '{"response": "AI service not configured"}'
             
-            # Use HTTP client to call Gemini API directly
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={settings.GEMINI_API_KEY}",
-                    json={
-                        "contents": [{
-                            "parts": [{
-                                "text": prompt
-                            }]
-                        }]
-                    }
-                )
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    return result["candidates"][0]["content"]["parts"][0]["text"]
-                else:
-                    logger.error(f"Gemini API error: {response.status_code}")
-                    return '{"response": "AI service temporarily unavailable"}'
+            # Use Universal AI Loader for multi-provider support
+            result = await self.ai_loader.generate_text(
+                prompt=prompt,
+                max_tokens=2048,
+                temperature=0.7
+            )
+            
+            if result and "text" in result:
+                logger.info(f"Generated response using {result.get('provider')}:{result.get('model_used')}")
+                return result["text"]
+            else:
+                logger.error("AI generation returned no text")
+                return '{"response": "AI service temporarily unavailable"}'
                     
         except Exception as e:
             logger.error(f"AI generation error: {e}")
