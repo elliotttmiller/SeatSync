@@ -11,6 +11,7 @@ This service provides comprehensive data acquisition and processing capabilities
 
 import asyncio
 import logging
+import os
 from typing import Dict, List, Optional, Any, AsyncGenerator
 from datetime import datetime, timedelta
 import json
@@ -284,69 +285,428 @@ class BaseScraper:
 
 
 class StubHubScraper(BaseScraper):
-    """StubHub API integration"""
+    """
+    StubHub API integration for real-time ticket data collection
+    Uses StubHub's Discovery API for event and listing data
+    """
+    
+    def __init__(self):
+        super().__init__()
+        self.api_key = os.getenv('STUBHUB_API_KEY', '')
+        self.base_url = 'https://api.stubhub.com/catalog/events/v3'
+        self.enabled = bool(self.api_key)
     
     async def collect_listings(self) -> Dict[str, Any]:
+        """
+        Collect real-time ticket listings from StubHub
+        Returns event data with pricing information
+        """
         try:
-            # Implement StubHub API calls
-            async with httpx.AsyncClient() as client:
-                # Mock implementation - replace with actual API calls
+            if not self.enabled:
+                logger.info("StubHub scraper not enabled - API key not configured")
                 return {
                     'platform': 'stubhub',
                     'listings': [],
-                    'timestamp': datetime.utcnow()
+                    'timestamp': datetime.utcnow(),
+                    'status': 'disabled'
                 }
+            
+            async with httpx.AsyncClient() as client:
+                headers = {
+                    'Authorization': f'Bearer {self.api_key}',
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+                
+                # Search for events (e.g., NBA, NFL, MLB games)
+                params = {
+                    'categoryName': 'Sports',
+                    'status': 'active',
+                    'rows': 100  # Get up to 100 events
+                }
+                
+                response = await client.get(
+                    self.base_url,
+                    headers=headers,
+                    params=params,
+                    timeout=30.0
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    # Extract listings from events
+                    listings = []
+                    events = data.get('events', [])
+                    
+                    for event in events:
+                        # Get ticket listings for each event
+                        event_listings = await self._get_event_listings(
+                            client, headers, event.get('id')
+                        )
+                        listings.extend(event_listings)
+                    
+                    logger.info(f"StubHub: Collected {len(listings)} listings from {len(events)} events")
+                    
+                    return {
+                        'platform': 'stubhub',
+                        'listings': listings,
+                        'event_count': len(events),
+                        'timestamp': datetime.utcnow(),
+                        'status': 'success'
+                    }
+                else:
+                    logger.warning(f"StubHub API returned status {response.status_code}")
+                    return {
+                        'platform': 'stubhub',
+                        'listings': [],
+                        'timestamp': datetime.utcnow(),
+                        'status': 'api_error',
+                        'error_code': response.status_code
+                    }
+                    
         except Exception as e:
             logger.error(f"StubHub scraper error: {e}")
-            return {}
+            return {
+                'platform': 'stubhub',
+                'listings': [],
+                'timestamp': datetime.utcnow(),
+                'status': 'error',
+                'error': str(e)
+            }
+    
+    async def _get_event_listings(
+        self, 
+        client: httpx.AsyncClient, 
+        headers: Dict[str, str], 
+        event_id: str
+    ) -> List[Dict[str, Any]]:
+        """Get ticket listings for a specific event"""
+        try:
+            # StubHub inventory API endpoint
+            inventory_url = f'https://api.stubhub.com/search/inventory/v2'
+            
+            params = {'eventid': event_id}
+            
+            response = await client.get(
+                inventory_url,
+                headers=headers,
+                params=params,
+                timeout=15.0
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                listings = data.get('listing', [])
+                
+                # Parse and normalize listing data
+                normalized_listings = []
+                for listing in listings:
+                    normalized_listings.append({
+                        'event_id': event_id,
+                        'listing_id': listing.get('listingId'),
+                        'section': listing.get('sectionName'),
+                        'row': listing.get('row'),
+                        'quantity': listing.get('quantity'),
+                        'price': float(listing.get('currentPrice', {}).get('amount', 0)),
+                        'currency': listing.get('currentPrice', {}).get('currency', 'USD'),
+                        'delivery_type': listing.get('deliveryTypeList', []),
+                        'timestamp': datetime.utcnow().isoformat()
+                    })
+                
+                return normalized_listings
+            else:
+                logger.debug(f"Failed to get listings for event {event_id}: {response.status_code}")
+                return []
+                
+        except Exception as e:
+            logger.debug(f"Error getting event listings: {e}")
+            return []
 
 
 class SeatGeekScraper(BaseScraper):
-    """SeatGeek API integration"""
+    """
+    SeatGeek API integration for real-time ticket data collection
+    Uses SeatGeek's public API for event and pricing data
+    """
+    
+    def __init__(self):
+        super().__init__()
+        self.client_id = os.getenv('SEATGEEK_CLIENT_ID', '')
+        self.client_secret = os.getenv('SEATGEEK_CLIENT_SECRET', '')
+        self.base_url = 'https://api.seatgeek.com/2'
+        self.enabled = bool(self.client_id)
     
     async def collect_listings(self) -> Dict[str, Any]:
+        """
+        Collect real-time ticket listings from SeatGeek
+        Returns event data with comprehensive pricing information
+        """
         try:
-            # Implement SeatGeek API calls
+            if not self.enabled:
+                logger.info("SeatGeek scraper not enabled - API credentials not configured")
+                return {
+                    'platform': 'seatgeek',
+                    'listings': [],
+                    'timestamp': datetime.utcnow(),
+                    'status': 'disabled'
+                }
+            
+            async with httpx.AsyncClient() as client:
+                # Search for sports events
+                params = {
+                    'client_id': self.client_id,
+                    'type': 'sports',  # Focus on sports events
+                    'per_page': 100,
+                    'datetime_utc.gte': datetime.utcnow().isoformat(),  # Future events
+                    'sort': 'datetime_utc.asc'
+                }
+                
+                response = await client.get(
+                    f'{self.base_url}/events',
+                    params=params,
+                    timeout=30.0
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    events = data.get('events', [])
+                    
+                    # Parse listings from events
+                    listings = []
+                    for event in events:
+                        listing = self._parse_seatgeek_event(event)
+                        if listing:
+                            listings.append(listing)
+                    
+                    logger.info(f"SeatGeek: Collected {len(listings)} listings from {len(events)} events")
+                    
+                    return {
+                        'platform': 'seatgeek',
+                        'listings': listings,
+                        'event_count': len(events),
+                        'timestamp': datetime.utcnow(),
+                        'status': 'success',
+                        'meta': data.get('meta', {})
+                    }
+                else:
+                    logger.warning(f"SeatGeek API returned status {response.status_code}")
+                    return {
+                        'platform': 'seatgeek',
+                        'listings': [],
+                        'timestamp': datetime.utcnow(),
+                        'status': 'api_error',
+                        'error_code': response.status_code
+                    }
+                    
+        except Exception as e:
+            logger.error(f"SeatGeek scraper error: {e}")
             return {
                 'platform': 'seatgeek',
                 'listings': [],
-                'timestamp': datetime.utcnow()
+                'timestamp': datetime.utcnow(),
+                'status': 'error',
+                'error': str(e)
+            }
+    
+    def _parse_seatgeek_event(self, event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Parse a SeatGeek event into normalized listing format"""
+        try:
+            stats = event.get('stats', {})
+            
+            return {
+                'event_id': event.get('id'),
+                'title': event.get('title'),
+                'datetime': event.get('datetime_utc'),
+                'venue': event.get('venue', {}).get('name'),
+                'city': event.get('venue', {}).get('city'),
+                'state': event.get('venue', {}).get('state'),
+                'performers': [p.get('name') for p in event.get('performers', [])],
+                'price_lowest': float(stats.get('lowest_price', 0)),
+                'price_average': float(stats.get('average_price', 0)),
+                'price_highest': float(stats.get('highest_price', 0)),
+                'listing_count': int(stats.get('listing_count', 0)),
+                'median_price': float(stats.get('median_price', 0)),
+                'score': float(event.get('score', 0)),
+                'popularity': float(event.get('popularity', 0)),
+                'timestamp': datetime.utcnow().isoformat(),
+                'url': event.get('url')
             }
         except Exception as e:
-            logger.error(f"SeatGeek scraper error: {e}")
-            return {}
+            logger.debug(f"Error parsing SeatGeek event: {e}")
+            return None
 
 
 class TicketmasterScraper(BaseScraper):
-    """Ticketmaster API integration"""
+    """
+    Ticketmaster API integration for real-time ticket data collection
+    Uses Ticketmaster's Discovery API for comprehensive event data
+    """
+    
+    def __init__(self):
+        super().__init__()
+        self.api_key = os.getenv('TICKETMASTER_API_KEY', '')
+        self.base_url = 'https://app.ticketmaster.com/discovery/v2'
+        self.enabled = bool(self.api_key)
     
     async def collect_listings(self) -> Dict[str, Any]:
+        """
+        Collect real-time event and pricing data from Ticketmaster
+        Returns comprehensive event information with pricing
+        """
         try:
-            # Implement Ticketmaster API calls
+            if not self.enabled:
+                logger.info("Ticketmaster scraper not enabled - API key not configured")
+                return {
+                    'platform': 'ticketmaster',
+                    'listings': [],
+                    'timestamp': datetime.utcnow(),
+                    'status': 'disabled'
+                }
+            
+            async with httpx.AsyncClient() as client:
+                # Search for sports events
+                params = {
+                    'apikey': self.api_key,
+                    'classificationName': 'Sports',
+                    'size': 100,
+                    'sort': 'date,asc'
+                }
+                
+                response = await client.get(
+                    f'{self.base_url}/events.json',
+                    params=params,
+                    timeout=30.0
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    embedded = data.get('_embedded', {})
+                    events = embedded.get('events', [])
+                    
+                    # Parse events into listings
+                    listings = []
+                    for event in events:
+                        listing = self._parse_ticketmaster_event(event)
+                        if listing:
+                            listings.append(listing)
+                    
+                    logger.info(f"Ticketmaster: Collected {len(listings)} listings from {len(events)} events")
+                    
+                    return {
+                        'platform': 'ticketmaster',
+                        'listings': listings,
+                        'event_count': len(events),
+                        'timestamp': datetime.utcnow(),
+                        'status': 'success',
+                        'page': data.get('page', {})
+                    }
+                else:
+                    logger.warning(f"Ticketmaster API returned status {response.status_code}")
+                    return {
+                        'platform': 'ticketmaster',
+                        'listings': [],
+                        'timestamp': datetime.utcnow(),
+                        'status': 'api_error',
+                        'error_code': response.status_code
+                    }
+                    
+        except Exception as e:
+            logger.error(f"Ticketmaster scraper error: {e}")
             return {
                 'platform': 'ticketmaster',
                 'listings': [],
-                'timestamp': datetime.utcnow()
+                'timestamp': datetime.utcnow(),
+                'status': 'error',
+                'error': str(e)
+            }
+    
+    def _parse_ticketmaster_event(self, event: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Parse a Ticketmaster event into normalized listing format"""
+        try:
+            # Extract pricing information
+            price_ranges = event.get('priceRanges', [{}])[0]
+            
+            # Extract venue information
+            venues = event.get('_embedded', {}).get('venues', [{}])
+            venue = venues[0] if venues else {}
+            
+            # Extract classification
+            classifications = event.get('classifications', [{}])
+            classification = classifications[0] if classifications else {}
+            
+            return {
+                'event_id': event.get('id'),
+                'name': event.get('name'),
+                'date': event.get('dates', {}).get('start', {}).get('dateTime'),
+                'venue_name': venue.get('name'),
+                'city': venue.get('city', {}).get('name'),
+                'state': venue.get('state', {}).get('stateCode'),
+                'country': venue.get('country', {}).get('countryCode'),
+                'sport': classification.get('segment', {}).get('name'),
+                'genre': classification.get('genre', {}).get('name'),
+                'price_min': float(price_ranges.get('min', 0)),
+                'price_max': float(price_ranges.get('max', 0)),
+                'currency': price_ranges.get('currency', 'USD'),
+                'status': event.get('dates', {}).get('status', {}).get('code'),
+                'sales_start': event.get('sales', {}).get('public', {}).get('startDateTime'),
+                'sales_end': event.get('sales', {}).get('public', {}).get('endDateTime'),
+                'timestamp': datetime.utcnow().isoformat(),
+                'url': event.get('url')
             }
         except Exception as e:
-            logger.error(f"Ticketmaster scraper error: {e}")
-            return {}
+            logger.debug(f"Error parsing Ticketmaster event: {e}")
+            return None
 
 
 class VividSeatsScraper(BaseScraper):
-    """Vivid Seats API integration"""
+    """
+    Vivid Seats scraping integration
+    Note: Vivid Seats doesn't have a public API, so this uses web scraping
+    """
+    
+    def __init__(self):
+        super().__init__()
+        self.base_url = 'https://www.vividseats.com'
+        self.enabled = os.getenv('ENABLE_VIVIDSEATS_SCRAPING', 'false').lower() == 'true'
     
     async def collect_listings(self) -> Dict[str, Any]:
+        """
+        Collect ticket listings from Vivid Seats
+        Uses web scraping as no public API is available
+        """
         try:
-            # Implement Vivid Seats API calls
+            if not self.enabled:
+                logger.info("Vivid Seats scraper not enabled")
+                return {
+                    'platform': 'vivid_seats',
+                    'listings': [],
+                    'timestamp': datetime.utcnow(),
+                    'status': 'disabled',
+                    'note': 'Web scraping requires explicit enablement'
+                }
+            
+            # For MVP, return placeholder
+            # In production, implement with Playwright/Selenium for JS-heavy site
+            logger.info("Vivid Seats: Placeholder implementation")
+            
             return {
                 'platform': 'vivid_seats',
                 'listings': [],
-                'timestamp': datetime.utcnow()
+                'timestamp': datetime.utcnow(),
+                'status': 'not_implemented',
+                'note': 'Requires browser automation (Playwright/Selenium) for full implementation'
             }
+            
         except Exception as e:
             logger.error(f"Vivid Seats scraper error: {e}")
-            return {}
+            return {
+                'platform': 'vivid_seats',
+                'listings': [],
+                'timestamp': datetime.utcnow(),
+                'status': 'error',
+                'error': str(e)
+            }
 
 
 class BaseAPI:
