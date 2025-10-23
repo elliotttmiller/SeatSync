@@ -721,83 +721,364 @@ class BaseAPI:
 
 
 class SportradarAPI(BaseAPI):
-    """Sportradar API integration"""
+    """
+    Sportradar API integration for professional sports data
+    Provides comprehensive coverage of major sports leagues
+    """
+    
+    def __init__(self):
+        super().__init__()
+        self.api_key = os.getenv('SPORTRADAR_API_KEY', '')
+        self.base_url = 'https://api.sportradar.us'
+        self.enabled = bool(self.api_key)
     
     async def get_current_data(self) -> Dict[str, Any]:
+        """Get current sports data from Sportradar"""
         try:
-            # Implement Sportradar API calls
+            if not self.enabled:
+                logger.info("Sportradar API not enabled - API key not configured")
+                return {
+                    'source': 'sportradar',
+                    'data': {},
+                    'timestamp': datetime.utcnow(),
+                    'status': 'disabled'
+                }
+            
+            # Get data from multiple sports
+            data = {}
+            sports = ['nba', 'nfl', 'mlb', 'nhl']
+            
+            async with httpx.AsyncClient() as client:
+                for sport in sports:
+                    try:
+                        sport_data = await self._get_sport_data(client, sport)
+                        if sport_data:
+                            data[sport] = sport_data
+                    except Exception as e:
+                        logger.debug(f"Failed to get {sport} data: {e}")
+            
             return {
                 'source': 'sportradar',
-                'data': {},
-                'timestamp': datetime.utcnow()
+                'data': data,
+                'timestamp': datetime.utcnow(),
+                'status': 'success' if data else 'no_data'
             }
         except Exception as e:
             logger.error(f"Sportradar API error: {e}")
+            return {
+                'source': 'sportradar',
+                'data': {},
+                'timestamp': datetime.utcnow(),
+                'status': 'error',
+                'error': str(e)
+            }
+    
+    async def _get_sport_data(self, client: httpx.AsyncClient, sport: str) -> Dict[str, Any]:
+        """Get data for a specific sport"""
+        # Sportradar endpoints vary by sport
+        endpoints = {
+            'nba': f'{self.base_url}/nba/trial/v8/en/games/schedule.json',
+            'nfl': f'{self.base_url}/nfl/official/trial/v7/en/games/schedule.json',
+            'mlb': f'{self.base_url}/mlb/trial/v7/en/games/schedule.json',
+            'nhl': f'{self.base_url}/nhl/trial/v8/en/games/schedule.json'
+        }
+        
+        url = endpoints.get(sport)
+        if not url:
+            return {}
+        
+        params = {'api_key': self.api_key}
+        
+        response = await client.get(url, params=params, timeout=15.0)
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.debug(f"Sportradar {sport} API error: {response.status_code}")
             return {}
 
 
 class ESPNAPI(BaseAPI):
-    """ESPN API integration"""
+    """
+    ESPN API integration for sports scores and team data
+    Uses ESPN's public API (no key required for basic access)
+    """
+    
+    def __init__(self):
+        super().__init__()
+        self.base_url = 'https://site.api.espn.com/apis/site/v2/sports'
+        self.enabled = True  # Public API, always available
     
     async def get_current_data(self) -> Dict[str, Any]:
+        """Get current sports data from ESPN"""
         try:
-            # Implement ESPN API calls
+            data = {}
+            
+            # Sports endpoints in ESPN API
+            sports = {
+                'basketball/nba': 'nba',
+                'football/nfl': 'nfl',
+                'baseball/mlb': 'mlb',
+                'hockey/nhl': 'nhl'
+            }
+            
+            async with httpx.AsyncClient() as client:
+                for espn_path, sport_key in sports.items():
+                    try:
+                        sport_data = await self._get_sport_scoreboard(client, espn_path)
+                        if sport_data:
+                            data[sport_key] = sport_data
+                    except Exception as e:
+                        logger.debug(f"Failed to get ESPN {sport_key} data: {e}")
+            
+            logger.info(f"ESPN: Collected data for {len(data)} sports")
+            
             return {
                 'source': 'espn',
-                'data': {},
-                'timestamp': datetime.utcnow()
+                'data': data,
+                'timestamp': datetime.utcnow(),
+                'status': 'success' if data else 'no_data'
             }
         except Exception as e:
             logger.error(f"ESPN API error: {e}")
+            return {
+                'source': 'espn',
+                'data': {},
+                'timestamp': datetime.utcnow(),
+                'status': 'error',
+                'error': str(e)
+            }
+    
+    async def _get_sport_scoreboard(self, client: httpx.AsyncClient, sport_path: str) -> Dict[str, Any]:
+        """Get scoreboard data for a specific sport"""
+        try:
+            url = f'{self.base_url}/{sport_path}/scoreboard'
+            
+            response = await client.get(url, timeout=15.0)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Parse and normalize the data
+                events = data.get('events', [])
+                
+                return {
+                    'events': events,
+                    'leagues': data.get('leagues', []),
+                    'season': data.get('season', {}),
+                    'event_count': len(events)
+                }
+            else:
+                logger.debug(f"ESPN {sport_path} API error: {response.status_code}")
+                return {}
+                
+        except Exception as e:
+            logger.debug(f"Error getting ESPN scoreboard: {e}")
             return {}
 
 
 class NBAAPI(BaseAPI):
-    """NBA Official API integration"""
+    """
+    NBA Official API integration using balldontlie or NBA stats API
+    Provides detailed NBA statistics and game data
+    """
+    
+    def __init__(self):
+        super().__init__()
+        # Using balldontlie.io as it's free and doesn't require key
+        self.base_url = 'https://api.balldontlie.io/v1'
+        self.api_key = os.getenv('BALLDONTLIE_API_KEY', '')
+        self.enabled = True  # Free tier available
     
     async def get_current_data(self) -> Dict[str, Any]:
+        """Get current NBA data"""
         try:
-            # Implement NBA API calls
+            async with httpx.AsyncClient() as client:
+                headers = {}
+                if self.api_key:
+                    headers['Authorization'] = self.api_key
+                
+                # Get games
+                games_url = f'{self.base_url}/games'
+                params = {
+                    'per_page': 100,
+                    'start_date': datetime.utcnow().strftime('%Y-%m-%d')
+                }
+                
+                response = await client.get(
+                    games_url,
+                    headers=headers,
+                    params=params,
+                    timeout=15.0
+                )
+                
+                if response.status_code == 200:
+                    games_data = response.json()
+                    
+                    # Get teams data
+                    teams_url = f'{self.base_url}/teams'
+                    teams_response = await client.get(teams_url, headers=headers, timeout=15.0)
+                    teams_data = teams_response.json() if teams_response.status_code == 200 else {}
+                    
+                    logger.info(f"NBA: Collected {len(games_data.get('data', []))} games")
+                    
+                    return {
+                        'source': 'nba',
+                        'data': {
+                            'games': games_data.get('data', []),
+                            'teams': teams_data.get('data', []),
+                            'meta': games_data.get('meta', {})
+                        },
+                        'timestamp': datetime.utcnow(),
+                        'status': 'success'
+                    }
+                else:
+                    logger.debug(f"NBA API error: {response.status_code}")
+                    return {
+                        'source': 'nba',
+                        'data': {},
+                        'timestamp': datetime.utcnow(),
+                        'status': 'api_error',
+                        'error_code': response.status_code
+                    }
+                    
+        except Exception as e:
+            logger.error(f"NBA API error: {e}")
             return {
                 'source': 'nba',
                 'data': {},
-                'timestamp': datetime.utcnow()
+                'timestamp': datetime.utcnow(),
+                'status': 'error',
+                'error': str(e)
             }
-        except Exception as e:
-            logger.error(f"NBA API error: {e}")
-            return {}
 
 
 class NFLAPI(BaseAPI):
-    """NFL Official API integration"""
+    """
+    NFL data integration using TheSportsDB or ESPN
+    Provides NFL game schedules and team information
+    """
+    
+    def __init__(self):
+        super().__init__()
+        # Using TheSportsDB free API
+        self.base_url = 'https://www.thesportsdb.com/api/v1/json'
+        self.api_key = os.getenv('THESPORTSDB_API_KEY', '3')  # Free tier key
+        self.enabled = True
     
     async def get_current_data(self) -> Dict[str, Any]:
+        """Get current NFL data"""
         try:
-            # Implement NFL API calls
+            async with httpx.AsyncClient() as client:
+                # Get NFL events
+                events_url = f'{self.base_url}/{self.api_key}/eventsnextleague.php'
+                params = {'id': '4391'}  # NFL league ID
+                
+                response = await client.get(events_url, params=params, timeout=15.0)
+                
+                if response.status_code == 200:
+                    events_data = response.json()
+                    events = events_data.get('events', [])
+                    
+                    logger.info(f"NFL: Collected {len(events)} upcoming games")
+                    
+                    return {
+                        'source': 'nfl',
+                        'data': {
+                            'events': events,
+                            'event_count': len(events)
+                        },
+                        'timestamp': datetime.utcnow(),
+                        'status': 'success'
+                    }
+                else:
+                    logger.debug(f"NFL API error: {response.status_code}")
+                    return {
+                        'source': 'nfl',
+                        'data': {},
+                        'timestamp': datetime.utcnow(),
+                        'status': 'api_error'
+                    }
+                    
+        except Exception as e:
+            logger.error(f"NFL API error: {e}")
             return {
                 'source': 'nfl',
                 'data': {},
-                'timestamp': datetime.utcnow()
+                'timestamp': datetime.utcnow(),
+                'status': 'error',
+                'error': str(e)
             }
-        except Exception as e:
-            logger.error(f"NFL API error: {e}")
-            return {}
 
 
 class MLBAPI(BaseAPI):
-    """MLB Official API integration"""
+    """
+    MLB Official API integration
+    Provides comprehensive MLB game and statistics data
+    """
+    
+    def __init__(self):
+        super().__init__()
+        # MLB StatsAPI is free and public
+        self.base_url = 'https://statsapi.mlb.com/api/v1'
+        self.enabled = True
     
     async def get_current_data(self) -> Dict[str, Any]:
+        """Get current MLB data"""
         try:
-            # Implement MLB API calls
+            async with httpx.AsyncClient() as client:
+                # Get today's schedule
+                schedule_url = f'{self.base_url}/schedule'
+                params = {
+                    'sportId': 1,  # MLB
+                    'date': datetime.utcnow().strftime('%Y-%m-%d')
+                }
+                
+                response = await client.get(schedule_url, params=params, timeout=15.0)
+                
+                if response.status_code == 200:
+                    schedule_data = response.json()
+                    dates = schedule_data.get('dates', [])
+                    
+                    games = []
+                    for date_entry in dates:
+                        games.extend(date_entry.get('games', []))
+                    
+                    # Get teams
+                    teams_url = f'{self.base_url}/teams'
+                    teams_response = await client.get(teams_url, params={'sportId': 1}, timeout=15.0)
+                    teams_data = teams_response.json() if teams_response.status_code == 200 else {}
+                    
+                    logger.info(f"MLB: Collected {len(games)} games")
+                    
+                    return {
+                        'source': 'mlb',
+                        'data': {
+                            'games': games,
+                            'teams': teams_data.get('teams', []),
+                            'schedule': schedule_data
+                        },
+                        'timestamp': datetime.utcnow(),
+                        'status': 'success'
+                    }
+                else:
+                    logger.debug(f"MLB API error: {response.status_code}")
+                    return {
+                        'source': 'mlb',
+                        'data': {},
+                        'timestamp': datetime.utcnow(),
+                        'status': 'api_error'
+                    }
+                    
+        except Exception as e:
+            logger.error(f"MLB API error: {e}")
             return {
                 'source': 'mlb',
                 'data': {},
-                'timestamp': datetime.utcnow()
+                'timestamp': datetime.utcnow(),
+                'status': 'error',
+                'error': str(e)
             }
-        except Exception as e:
-            logger.error(f"MLB API error: {e}")
-            return {}
 
 
 class BaseSentimentAnalyzer:
