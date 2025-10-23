@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings
 from pydantic import ConfigDict
 from typing import List, Optional
+import os
 
 class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
@@ -31,8 +32,16 @@ class Settings(BaseSettings):
     # Add any other fields from your .env as needed
 
     model_config = ConfigDict(
-        env_file=".env",
-        case_sensitive=True
+        # Look for .env files in multiple locations
+        env_file=[
+            ".env",
+            "backend/.env",
+            ".env.test",
+            "backend/.env.test"
+        ],
+        env_file_encoding='utf-8',
+        case_sensitive=True,
+        extra='ignore'
     )
 
 settings = Settings() 

@@ -500,3 +500,151 @@ class NewsAnalyzer(BaseSentimentAnalyzer):
         except Exception as e:
             logger.error(f"News sentiment error: {e}")
             return {}
+
+
+class BaseFeatureEngineer:
+    """Base class for feature engineers"""
+    
+    async def process(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Override in subclasses"""
+        raise NotImplementedError
+
+
+class MarketFeatureEngineer(BaseFeatureEngineer):
+    """Market-based feature engineering"""
+    
+    async def process(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Process marketplace data into features"""
+        try:
+            features = {}
+            
+            if raw_data.get('type') != 'marketplace':
+                return features
+            
+            platforms = raw_data.get('platforms', {})
+            
+            # Calculate aggregate market features
+            all_listings = []
+            for platform, data in platforms.items():
+                listings = data.get('listings', [])
+                all_listings.extend(listings)
+            
+            if all_listings:
+                prices = [l.get('price', 0) for l in all_listings if l.get('price')]
+                if prices:
+                    features['market_avg_price'] = sum(prices) / len(prices)
+                    features['market_min_price'] = min(prices)
+                    features['market_max_price'] = max(prices)
+                    features['market_price_std'] = (sum((p - features['market_avg_price'])**2 for p in prices) / len(prices)) ** 0.5
+                    features['market_listing_count'] = len(all_listings)
+                    features['market_price_range'] = features['market_max_price'] - features['market_min_price']
+            
+            return features
+            
+        except Exception as e:
+            logger.error(f"Market feature engineering error: {e}")
+            return {}
+
+
+class TeamFeatureEngineer(BaseFeatureEngineer):
+    """Team and sports-based feature engineering"""
+    
+    async def process(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Process sports data into features"""
+        try:
+            features = {}
+            
+            if raw_data.get('type') != 'sports':
+                return features
+            
+            leagues = raw_data.get('leagues', {})
+            
+            # Process team performance data
+            for league, data in leagues.items():
+                league_data = data.get('data', {})
+                
+                # Extract team metrics
+                if 'team_stats' in league_data:
+                    features[f'{league.lower()}_team_rank'] = league_data['team_stats'].get('rank', 0)
+                    features[f'{league.lower()}_win_rate'] = league_data['team_stats'].get('win_rate', 0.5)
+                    features[f'{league.lower()}_recent_form'] = league_data['team_stats'].get('recent_form', 0)
+            
+            return features
+            
+        except Exception as e:
+            logger.error(f"Team feature engineering error: {e}")
+            return {}
+
+
+class TemporalFeatureEngineer(BaseFeatureEngineer):
+    """Time-based feature engineering"""
+    
+    async def process(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Process temporal features"""
+        try:
+            features = {}
+            
+            timestamp = raw_data.get('timestamp', datetime.utcnow())
+            if isinstance(timestamp, str):
+                timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+            
+            # Extract temporal features
+            features['hour_of_day'] = timestamp.hour
+            features['day_of_week'] = timestamp.weekday()
+            features['day_of_month'] = timestamp.day
+            features['month'] = timestamp.month
+            features['is_weekend'] = 1 if timestamp.weekday() >= 5 else 0
+            features['is_business_hours'] = 1 if 9 <= timestamp.hour <= 17 else 0
+            
+            return features
+            
+        except Exception as e:
+            logger.error(f"Temporal feature engineering error: {e}")
+            return {}
+
+
+class ExternalFeatureEngineer(BaseFeatureEngineer):
+    """External context feature engineering"""
+    
+    async def process(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Process external context data into features"""
+        try:
+            features = {}
+            
+            data_type = raw_data.get('type')
+            
+            if data_type == 'sentiment':
+                # Process sentiment data
+                sources = raw_data.get('sources', {})
+                sentiments = []
+                for source, data in sources.items():
+                    sentiment_data = data.get('sentiment_data', {})
+                    if 'score' in sentiment_data:
+                        sentiments.append(sentiment_data['score'])
+                
+                if sentiments:
+                    features['avg_sentiment'] = sum(sentiments) / len(sentiments)
+                    features['sentiment_volatility'] = (sum((s - features['avg_sentiment'])**2 for s in sentiments) / len(sentiments)) ** 0.5
+            
+            elif data_type == 'external':
+                # Process weather data
+                weather = raw_data.get('weather', {})
+                if weather:
+                    features['weather_score'] = weather.get('score', 0.5)
+                    features['temperature'] = weather.get('temperature', 70)
+                
+                # Process competing events
+                events = raw_data.get('events', {})
+                if events:
+                    features['competing_events_count'] = events.get('count', 0)
+                
+                # Process news
+                news = raw_data.get('news', {})
+                if news:
+                    features['news_mentions'] = news.get('mentions', 0)
+            
+            return features
+            
+        except Exception as e:
+            logger.error(f"External feature engineering error: {e}")
+            return {}
