@@ -301,7 +301,7 @@ def show_home():
         
         if activities:
             df_activity = pd.DataFrame(activities)
-            st.dataframe(df_activity, use_container_width=True)
+            st.dataframe(df_activity, width="stretch")
 
 
 def show_scraping():
@@ -398,7 +398,7 @@ def show_scraping():
                                 st.metric("Max Price", f"${df_listings['price'].max():.2f}")
                         
                         # Display data table
-                        st.dataframe(df_listings, use_container_width=True)
+                        st.dataframe(df_listings, width="stretch")
                         
                         # Price distribution chart
                         if 'price' in df_listings.columns:
@@ -409,7 +409,7 @@ def show_scraping():
                                 nbins=30,
                                 title='Listing Price Distribution'
                             )
-                            st.plotly_chart(fig, use_container_width=True)
+                            st.plotly_chart(fig, width="stretch")
                 else:
                     st.error(f"❌ Scraping failed: {result.get('error', 'Unknown error')}")
     
@@ -429,7 +429,7 @@ def show_scraping():
             })
         
         df_history = pd.DataFrame(history_data)
-        st.dataframe(df_history, use_container_width=True)
+        st.dataframe(df_history, width="stretch")
 
 
 def run_scraping(marketplace: str, search_query: str) -> Dict[str, Any]:
@@ -444,27 +444,18 @@ def run_scraping(marketplace: str, search_query: str) -> Dict[str, Any]:
                 'timestamp': datetime.now().isoformat()
             }
         
-        # Use actual scraping engine
+        # Use unified scraping service
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
         async def scrape():
-            from app.services.advanced_ticket_scraper import AdvancedTicketScraper
+            from app.services.scraping_service import scrape_tickets
             
-            scraper = AdvancedTicketScraper()
-            await scraper.initialize()
+            result = await scrape_tickets(
+                marketplace=marketplace,
+                search_query=search_query
+            )
             
-            if marketplace.lower() == 'stubhub':
-                result = await scraper.scrape_stubhub(search_query=search_query)
-            elif marketplace.lower() == 'seatgeek':
-                result = await scraper.scrape_seatgeek(search_query=search_query)
-            else:
-                result = {
-                    'status': 'error',
-                    'error': f'Unknown marketplace: {marketplace}'
-                }
-            
-            await scraper.cleanup()
             return result
         
         result = loop.run_until_complete(scrape())
@@ -586,7 +577,7 @@ def show_ml_training():
                         orientation='h',
                         title='Top 10 Most Important Features'
                     )
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
     
     # Display trained models
     if st.session_state.ml_models:
@@ -604,7 +595,7 @@ def show_ml_training():
             })
         
         df_models = pd.DataFrame(models_data)
-        st.dataframe(df_models, use_container_width=True)
+        st.dataframe(df_models, width="stretch")
 
 
 def run_training(model_type: str, num_samples: int, hyperparameter_tuning: bool) -> Dict[str, Any]:
@@ -804,7 +795,7 @@ def show_prediction():
                     height=400
                 )
                 
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
                 
                 # Model contributions
                 if prediction.get('model_contributions'):
@@ -820,7 +811,7 @@ def show_prediction():
                         names='Model',
                         title='Contribution by Model'
                     )
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
 
 
 def run_prediction(ticket_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -1034,11 +1025,11 @@ def show_forecasting():
                     height=500
                 )
                 
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
                 
                 # Show data table
                 with st.expander("📊 View Forecast Data"):
-                    st.dataframe(df_forecast, use_container_width=True)
+                    st.dataframe(df_forecast, width="stretch")
 
 
 def run_forecasting(method: str, periods: int, seasonality: bool) -> Dict[str, Any]:
@@ -1269,7 +1260,7 @@ def show_dynamic_pricing():
                     height=400
                 )
                 
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
 
 def run_pricing_optimization(
@@ -1392,7 +1383,7 @@ def show_metrics():
             height=400
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     
     # System statistics
     st.markdown('<p class="sub-header">System Statistics</p>', unsafe_allow_html=True)
@@ -1451,7 +1442,7 @@ def show_metrics():
             title='Prediction Price Over Time'
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
 
 def show_configuration():

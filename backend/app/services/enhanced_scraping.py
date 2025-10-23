@@ -30,6 +30,10 @@ try:
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
+    # Define stub types for type hints when Playwright is not available
+    Browser = None  # type: ignore
+    Page = None  # type: ignore
+    BrowserContext = None  # type: ignore
 
 import httpx
 from bs4 import BeautifulSoup
