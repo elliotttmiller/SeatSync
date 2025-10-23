@@ -30,6 +30,10 @@ try:
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
     logging.warning("Playwright not available. Install with: pip install playwright")
+    # Define stub types for type hints when Playwright is not available
+    Browser = None  # type: ignore
+    Page = None  # type: ignore
+    BrowserContext = None  # type: ignore
 
 import httpx
 from bs4 import BeautifulSoup
