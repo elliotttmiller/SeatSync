@@ -1,0 +1,698 @@
+{
+  "team": "Minnesota Timberwolves",
+  "demo_date": "2025-10-24T00:40:34.787726",
+  "note": "This is demonstration data showing workflow functionality",
+  "results": {
+    "StubHub": {
+      "status": "success",
+      "platform": "stubhub",
+      "url": "https://www.stubhub.com/minnesota-timberwolves-tickets",
+      "listings": [
+        {
+          "price": 406.63869450075083,
+          "section": "110",
+          "row": "14",
+          "quantity": 1,
+          "platform": "stubhub",
+          "event": "vs Celtics - Nov 25, 2024"
+        },
+        {
+          "price": 291.8851825433131,
+          "section": "108",
+          "row": "8",
+          "quantity": 4,
+          "platform": "stubhub",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 218.21126805895116,
+          "section": "106",
+          "row": "1",
+          "quantity": 2,
+          "platform": "stubhub",
+          "event": "vs Warriors - Nov 20, 2024"
+        },
+        {
+          "price": 350.01236620226535,
+          "section": "102",
+          "row": "9",
+          "quantity": 2,
+          "platform": "stubhub",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 340.53235373531805,
+          "section": "107",
+          "row": "18",
+          "quantity": 4,
+          "platform": "stubhub",
+          "event": "vs Lakers - Nov 15, 2024"
+        },
+        {
+          "price": 255.39732912413848,
+          "section": "112",
+          "row": "20",
+          "quantity": 3,
+          "platform": "stubhub",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 100.52703421756516,
+          "section": "107",
+          "row": "9",
+          "quantity": 1,
+          "platform": "stubhub",
+          "event": "vs Celtics - Nov 25, 2024"
+        },
+        {
+          "price": 104.54949747625938,
+          "section": "103",
+          "row": "12",
+          "quantity": 2,
+          "platform": "stubhub",
+          "event": "vs Lakers - Nov 15, 2024"
+        },
+        {
+          "price": 374.00984544465405,
+          "section": "117",
+          "row": "18",
+          "quantity": 3,
+          "platform": "stubhub",
+          "event": "vs Celtics - Nov 25, 2024"
+        },
+        {
+          "price": 274.89522201057355,
+          "section": "110",
+          "row": "12",
+          "quantity": 2,
+          "platform": "stubhub",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 355.9951824153252,
+          "section": "102",
+          "row": "18",
+          "quantity": 2,
+          "platform": "stubhub",
+          "event": "vs Warriors - Nov 20, 2024"
+        },
+        {
+          "price": 168.4407098816611,
+          "section": "114",
+          "row": "18",
+          "quantity": 2,
+          "platform": "stubhub",
+          "event": "vs Celtics - Nov 25, 2024"
+        },
+        {
+          "price": 418.4670910692229,
+          "section": "111",
+          "row": "7",
+          "quantity": 2,
+          "platform": "stubhub",
+          "event": "vs Lakers - Nov 15, 2024"
+        },
+        {
+          "price": 279.246071733882,
+          "section": "102",
+          "row": "11",
+          "quantity": 2,
+          "platform": "stubhub",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 172.0558609304187,
+          "section": "119",
+          "row": "17",
+          "quantity": 2,
+          "platform": "stubhub",
+          "event": "vs Warriors - Nov 20, 2024"
+        },
+        {
+          "price": 194.88905470358208,
+          "section": "118",
+          "row": "9",
+          "quantity": 4,
+          "platform": "stubhub",
+          "event": "vs Lakers - Nov 15, 2024"
+        },
+        {
+          "price": 320.84354265284617,
+          "section": "109",
+          "row": "11",
+          "quantity": 4,
+          "platform": "stubhub",
+          "event": "vs Warriors - Nov 20, 2024"
+        },
+        {
+          "price": 448.9907638352204,
+          "section": "104",
+          "row": "21",
+          "quantity": 3,
+          "platform": "stubhub",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 197.9357016420819,
+          "section": "120",
+          "row": "17",
+          "quantity": 1,
+          "platform": "stubhub",
+          "event": "vs Warriors - Nov 20, 2024"
+        },
+        {
+          "price": 201.14070402633047,
+          "section": "102",
+          "row": "16",
+          "quantity": 2,
+          "platform": "stubhub",
+          "event": "vs Lakers - Nov 15, 2024"
+        },
+        {
+          "price": 328.0220848565086,
+          "section": "103",
+          "row": "13",
+          "quantity": 4,
+          "platform": "stubhub",
+          "event": "vs Warriors - Nov 20, 2024"
+        },
+        {
+          "price": 89.49750552922913,
+          "section": "113",
+          "row": "18",
+          "quantity": 2,
+          "platform": "stubhub",
+          "event": "vs Warriors - Nov 20, 2024"
+        },
+        {
+          "price": 91.47844286338707,
+          "section": "119",
+          "row": "2",
+          "quantity": 3,
+          "platform": "stubhub",
+          "event": "vs Warriors - Nov 20, 2024"
+        },
+        {
+          "price": 154.12629836570335,
+          "section": "101",
+          "row": "10",
+          "quantity": 4,
+          "platform": "stubhub",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 128.85329275902598,
+          "section": "120",
+          "row": "4",
+          "quantity": 3,
+          "platform": "stubhub",
+          "event": "vs Warriors - Nov 20, 2024"
+        },
+        {
+          "price": 204.29812963077,
+          "section": "116",
+          "row": "2",
+          "quantity": 2,
+          "platform": "stubhub",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 103.94979231233503,
+          "section": "117",
+          "row": "20",
+          "quantity": 2,
+          "platform": "stubhub",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 95.0663298255693,
+          "section": "119",
+          "row": "12",
+          "quantity": 1,
+          "platform": "stubhub",
+          "event": "vs Lakers - Nov 15, 2024"
+        },
+        {
+          "price": 148.69098408882616,
+          "section": "122",
+          "row": "15",
+          "quantity": 2,
+          "platform": "stubhub",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 193.65218173309904,
+          "section": "121",
+          "row": "4",
+          "quantity": 2,
+          "platform": "stubhub",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 412.4268474438353,
+          "section": "105",
+          "row": "16",
+          "quantity": 3,
+          "platform": "stubhub",
+          "event": "vs Celtics - Nov 25, 2024"
+        },
+        {
+          "price": 110.80690776012288,
+          "section": "121",
+          "row": "19",
+          "quantity": 4,
+          "platform": "stubhub",
+          "event": "vs Lakers - Nov 15, 2024"
+        },
+        {
+          "price": 392.74085515643293,
+          "section": "118",
+          "row": "14",
+          "quantity": 3,
+          "platform": "stubhub",
+          "event": "vs Celtics - Nov 25, 2024"
+        },
+        {
+          "price": 278.7152237599984,
+          "section": "112",
+          "row": "12",
+          "quantity": 2,
+          "platform": "stubhub",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 321.39738938168324,
+          "section": "101",
+          "row": "7",
+          "quantity": 2,
+          "platform": "stubhub",
+          "event": "vs Celtics - Nov 25, 2024"
+        },
+        {
+          "price": 183.36407709043942,
+          "section": "116",
+          "row": "2",
+          "quantity": 2,
+          "platform": "stubhub",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 411.78138913159256,
+          "section": "122",
+          "row": "3",
+          "quantity": 4,
+          "platform": "stubhub",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 237.71649854246598,
+          "section": "109",
+          "row": "1",
+          "quantity": 2,
+          "platform": "stubhub",
+          "event": "vs Lakers - Nov 15, 2024"
+        },
+        {
+          "price": 297.40253393217296,
+          "section": "111",
+          "row": "6",
+          "quantity": 1,
+          "platform": "stubhub",
+          "event": "vs Lakers - Nov 15, 2024"
+        },
+        {
+          "price": 76.60876629837531,
+          "section": "109",
+          "row": "14",
+          "quantity": 4,
+          "platform": "stubhub",
+          "event": "vs Warriors - Nov 20, 2024"
+        },
+        {
+          "price": 357.23465576129684,
+          "section": "119",
+          "row": "8",
+          "quantity": 2,
+          "platform": "stubhub",
+          "event": "vs Lakers - Nov 15, 2024"
+        },
+        {
+          "price": 325.96755428370136,
+          "section": "120",
+          "row": "19",
+          "quantity": 4,
+          "platform": "stubhub",
+          "event": "vs Celtics - Nov 25, 2024"
+        },
+        {
+          "price": 169.43799465778207,
+          "section": "124",
+          "row": "2",
+          "quantity": 3,
+          "platform": "stubhub",
+          "event": "vs Celtics - Nov 25, 2024"
+        },
+        {
+          "price": 76.85100161827575,
+          "section": "113",
+          "row": "17",
+          "quantity": 2,
+          "platform": "stubhub",
+          "event": "vs Warriors - Nov 20, 2024"
+        },
+        {
+          "price": 424.47375672927797,
+          "section": "112",
+          "row": "1",
+          "quantity": 3,
+          "platform": "stubhub",
+          "event": "vs Heat - Nov 30, 2024"
+        }
+      ],
+      "count": 45,
+      "timestamp": "2025-10-24T00:40:34.787031",
+      "scraper": "scrapling"
+    },
+    "SeatGeek": {
+      "status": "success",
+      "platform": "seatgeek",
+      "url": "https://seatgeek.com/minnesota-timberwolves-tickets",
+      "listings": [
+        {
+          "price": 147.16355094815282,
+          "section": "106",
+          "row": "2",
+          "quantity": 2,
+          "platform": "seatgeek",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 84.28329748544535,
+          "section": "115",
+          "row": "19",
+          "quantity": 2,
+          "platform": "seatgeek",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 420.779536733696,
+          "section": "111",
+          "row": "14",
+          "quantity": 4,
+          "platform": "seatgeek",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 273.17155407870274,
+          "section": "118",
+          "row": "9",
+          "quantity": 3,
+          "platform": "seatgeek",
+          "event": "vs Lakers - Nov 15, 2024"
+        },
+        {
+          "price": 264.2247123858649,
+          "section": "106",
+          "row": "19",
+          "quantity": 2,
+          "platform": "seatgeek",
+          "event": "vs Lakers - Nov 15, 2024"
+        },
+        {
+          "price": 195.00795835824937,
+          "section": "122",
+          "row": "1",
+          "quantity": 3,
+          "platform": "seatgeek",
+          "event": "vs Lakers - Nov 15, 2024"
+        },
+        {
+          "price": 396.11100480684007,
+          "section": "122",
+          "row": "12",
+          "quantity": 1,
+          "platform": "seatgeek",
+          "event": "vs Celtics - Nov 25, 2024"
+        },
+        {
+          "price": 127.35895115290396,
+          "section": "124",
+          "row": "18",
+          "quantity": 2,
+          "platform": "seatgeek",
+          "event": "vs Warriors - Nov 20, 2024"
+        },
+        {
+          "price": 79.09643714812839,
+          "section": "119",
+          "row": "19",
+          "quantity": 3,
+          "platform": "seatgeek",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 131.49215135299417,
+          "section": "124",
+          "row": "7",
+          "quantity": 2,
+          "platform": "seatgeek",
+          "event": "vs Lakers - Nov 15, 2024"
+        },
+        {
+          "price": 110.47822649058091,
+          "section": "107",
+          "row": "21",
+          "quantity": 2,
+          "platform": "seatgeek",
+          "event": "vs Lakers - Nov 15, 2024"
+        },
+        {
+          "price": 236.69181239251978,
+          "section": "120",
+          "row": "1",
+          "quantity": 4,
+          "platform": "seatgeek",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 107.5790701694716,
+          "section": "104",
+          "row": "3",
+          "quantity": 4,
+          "platform": "seatgeek",
+          "event": "vs Celtics - Nov 25, 2024"
+        },
+        {
+          "price": 331.4046321896181,
+          "section": "123",
+          "row": "20",
+          "quantity": 1,
+          "platform": "seatgeek",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 231.39439031275347,
+          "section": "117",
+          "row": "7",
+          "quantity": 4,
+          "platform": "seatgeek",
+          "event": "vs Lakers - Nov 15, 2024"
+        },
+        {
+          "price": 313.7385155751955,
+          "section": "110",
+          "row": "5",
+          "quantity": 2,
+          "platform": "seatgeek",
+          "event": "vs Warriors - Nov 20, 2024"
+        },
+        {
+          "price": 337.90366738389673,
+          "section": "124",
+          "row": "13",
+          "quantity": 1,
+          "platform": "seatgeek",
+          "event": "vs Lakers - Nov 15, 2024"
+        },
+        {
+          "price": 339.62077704394005,
+          "section": "118",
+          "row": "10",
+          "quantity": 1,
+          "platform": "seatgeek",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 163.3326824391596,
+          "section": "105",
+          "row": "6",
+          "quantity": 1,
+          "platform": "seatgeek",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 348.3727278334873,
+          "section": "102",
+          "row": "9",
+          "quantity": 3,
+          "platform": "seatgeek",
+          "event": "vs Celtics - Nov 25, 2024"
+        },
+        {
+          "price": 336.0844232459203,
+          "section": "118",
+          "row": "20",
+          "quantity": 4,
+          "platform": "seatgeek",
+          "event": "vs Lakers - Nov 15, 2024"
+        },
+        {
+          "price": 208.10176641210177,
+          "section": "101",
+          "row": "22",
+          "quantity": 3,
+          "platform": "seatgeek",
+          "event": "vs Warriors - Nov 20, 2024"
+        },
+        {
+          "price": 308.79936006339915,
+          "section": "115",
+          "row": "11",
+          "quantity": 2,
+          "platform": "seatgeek",
+          "event": "vs Lakers - Nov 15, 2024"
+        },
+        {
+          "price": 230.71808361835244,
+          "section": "118",
+          "row": "2",
+          "quantity": 3,
+          "platform": "seatgeek",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 417.44133051669814,
+          "section": "116",
+          "row": "3",
+          "quantity": 2,
+          "platform": "seatgeek",
+          "event": "vs Celtics - Nov 25, 2024"
+        },
+        {
+          "price": 215.77590219150937,
+          "section": "118",
+          "row": "20",
+          "quantity": 1,
+          "platform": "seatgeek",
+          "event": "vs Lakers - Nov 15, 2024"
+        },
+        {
+          "price": 123.10673791625035,
+          "section": "110",
+          "row": "1",
+          "quantity": 1,
+          "platform": "seatgeek",
+          "event": "vs Celtics - Nov 25, 2024"
+        },
+        {
+          "price": 250.27092646313264,
+          "section": "105",
+          "row": "11",
+          "quantity": 1,
+          "platform": "seatgeek",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 106.57561197013027,
+          "section": "114",
+          "row": "14",
+          "quantity": 3,
+          "platform": "seatgeek",
+          "event": "vs Celtics - Nov 25, 2024"
+        },
+        {
+          "price": 145.4460394239459,
+          "section": "104",
+          "row": "9",
+          "quantity": 2,
+          "platform": "seatgeek",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 286.0824867209092,
+          "section": "114",
+          "row": "8",
+          "quantity": 1,
+          "platform": "seatgeek",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 392.0942246913935,
+          "section": "109",
+          "row": "19",
+          "quantity": 2,
+          "platform": "seatgeek",
+          "event": "vs Celtics - Nov 25, 2024"
+        },
+        {
+          "price": 121.05673090220417,
+          "section": "116",
+          "row": "17",
+          "quantity": 1,
+          "platform": "seatgeek",
+          "event": "vs Lakers - Nov 15, 2024"
+        },
+        {
+          "price": 148.8558995096052,
+          "section": "123",
+          "row": "18",
+          "quantity": 2,
+          "platform": "seatgeek",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 76.70045574568242,
+          "section": "111",
+          "row": "15",
+          "quantity": 2,
+          "platform": "seatgeek",
+          "event": "vs Warriors - Nov 20, 2024"
+        },
+        {
+          "price": 128.39484447156428,
+          "section": "120",
+          "row": "2",
+          "quantity": 2,
+          "platform": "seatgeek",
+          "event": "vs Celtics - Nov 25, 2024"
+        },
+        {
+          "price": 124.67563185449814,
+          "section": "102",
+          "row": "10",
+          "quantity": 2,
+          "platform": "seatgeek",
+          "event": "vs Heat - Nov 30, 2024"
+        },
+        {
+          "price": 183.4813262708211,
+          "section": "115",
+          "row": "20",
+          "quantity": 3,
+          "platform": "seatgeek",
+          "event": "vs Celtics - Nov 25, 2024"
+        }
+      ],
+      "count": 38,
+      "timestamp": "2025-10-24T00:40:34.787112",
+      "scraper": "scrapling"
+    }
+  },
+  "summary": {
+    "total_listings": 83,
+    "marketplaces": [
+      "StubHub",
+      "SeatGeek"
+    ]
+  }
+}
