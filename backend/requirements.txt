@@ -34,12 +34,9 @@ prophet>=1.1.5
 statsmodels>=0.14.0
 # Additional data processing
 aiohttp>=3.8.0
-# Advanced web scraping
-playwright>=1.40.0
-beautifulsoup4>=4.12.0
-lxml>=5.0.0
-# Scrapling - Modern adaptive web scraping (optional, enable with USE_SCRAPLING=true)
-# Uncomment to use: scrapling[all]>=0.3.7
+# Advanced web scraping - Scrapling (REQUIRED)
+scrapling[all]>=0.3.7
+# Note: After installing, run: scrapling install
 # Streamlit for development UI
 streamlit>=1.28.0
 plotly>=5.18.0 
