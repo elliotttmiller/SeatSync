@@ -332,6 +332,8 @@ service-account-key.json
 .idx/*
 !.idx/dev.nix
 !.idx/icon.png
+!.idx/validate-config.sh
+!.idx/*.md
 .idx/.idx/
 
 # Nix
