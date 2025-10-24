@@ -52,7 +52,7 @@ async def test_scraping_logic():
             "Event URL discovery": "event_url" in stubhub_source and "event_href" in stubhub_source,
             "Event link finding": "event_links" in stubhub_source,
             "Separate event page fetch": "fetch_event" in stubhub_source,
-            "Regex price parsing": "import re" in stubhub_source,
+            "Regex price parsing": "re.search" in stubhub_source or "price_match" in stubhub_source,
             "Better error handling": "logger.info" in stubhub_source and "logger.warning" in stubhub_source,
         }
         

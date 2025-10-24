@@ -24,6 +24,8 @@ import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 import asyncio
+import re
+import urllib.parse
 
 logger = logging.getLogger(__name__)
 
@@ -171,15 +173,14 @@ class ScraplingScrapingService:
                 
                 # Search for events on StubHub
                 # StubHub structure: performer pages list all events for a team/artist
-                import urllib.parse
                 encoded_query = urllib.parse.quote(search_query)
                 
                 # Try multiple URL formats for StubHub
-                # 1. Direct performer page (most reliable)
-                # 2. Search results page
+                # Note: Performer IDs are specific to each team/artist
+                # The ID 5937 is for Minnesota Timberwolves as an example
+                # In production, use StubHub API to discover performer IDs
                 performer_slug = search_query.lower().replace(' ', '-')
                 search_urls = [
-                    f'https://www.stubhub.com/{performer_slug}-tickets/performer/5937/',  # Known Timberwolves ID
                     f'https://www.stubhub.com/{performer_slug}-tickets',
                     f'https://www.stubhub.com/find?q={encoded_query}',
                 ]
@@ -309,7 +310,6 @@ class ScraplingScrapingService:
                     
                     if price_text:
                         # Clean price - remove $, commas, "each", etc.
-                        import re
                         price_match = re.search(r'[\d,]+\.?\d*', price_text.replace(',', ''))
                         if price_match:
                             price = float(price_match.group())
@@ -398,7 +398,6 @@ class ScraplingScrapingService:
                     }
                 
                 # Search for events on SeatGeek
-                import urllib.parse
                 encoded_query = urllib.parse.quote(search_query)
                 
                 # Try multiple URL formats for SeatGeek
@@ -525,7 +524,6 @@ class ScraplingScrapingService:
                     
                     if price_element and price_element.text:
                         # Clean price
-                        import re
                         price_text = price_element.text
                         price_match = re.search(r'[\d,]+\.?\d*', price_text.replace(',', ''))
                         if price_match:
