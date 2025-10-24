@@ -1,14 +1,13 @@
 """
-Unified Scraping Service
+Unified Scraping Service - Scrapling-Powered
 Provides a clean, simple interface for all ticket scraping operations
 
-This service:
-- Auto-detects available scraping methods (Playwright vs HTTP)
-- Provides graceful fallbacks
-- Handles initialization automatically
-- Manages resource cleanup
-- Provides consistent error handling
-- Handles Windows-specific asyncio issues
+This service uses Scrapling exclusively for modern, adaptive web scraping:
+- Adaptive element tracking (survives website changes)
+- Built-in Cloudflare bypass
+- TLS fingerprint impersonation
+- 685x faster parsing than BeautifulSoup
+- Superior anti-bot detection
 """
 
 import logging
@@ -20,80 +19,67 @@ import asyncio
 logger = logging.getLogger(__name__)
 
 
-# Fix Windows asyncio issue with Playwright
+# Fix Windows asyncio issue
 if sys.platform == 'win32':
     try:
-        # Set event loop policy for Windows
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-        logger.info("Windows asyncio policy set for Playwright compatibility")
+        logger.info("Windows asyncio policy set")
     except Exception as e:
         logger.warning(f"Could not set Windows asyncio policy: {e}")
 
 
 class ScrapingService:
     """
-    Unified scraping service with automatic fallbacks
+    Scrapling-powered scraping service
+    Modern, adaptive web scraping with superior performance
     """
     
     def __init__(self):
         self.scraper = None
-        self.scraper_type = None
+        self.scraper_type = "scrapling"
         self.initialized = False
     
     async def initialize(self) -> bool:
         """
-        Initialize the best available scraper
-        Tries Playwright first, falls back to HTTP if needed
+        Initialize Scrapling scraper
         """
         if self.initialized:
             return True
         
-        # Try Playwright-based scraper first
         try:
-            from .advanced_ticket_scraper import AdvancedTicketScraper, PLAYWRIGHT_AVAILABLE
+            from .scrapling_service import get_scrapling_service, SCRAPLING_AVAILABLE
             
-            if PLAYWRIGHT_AVAILABLE:
-                logger.info("Initializing Playwright-based scraper...")
-                self.scraper = AdvancedTicketScraper()
-                success = await self.scraper.initialize()
-                
-                if success:
-                    self.scraper_type = "playwright"
-                    self.initialized = True
-                    logger.info("✅ Playwright scraper initialized successfully")
-                    return True
-                else:
-                    logger.warning("Playwright scraper initialization failed")
-        except Exception as e:
-            logger.warning(f"Could not initialize Playwright scraper: {e}")
-        
-        # Fallback: Use HTTP-based scraper
-        logger.info("Falling back to HTTP-based scraper...")
-        try:
-            from .enhanced_scraping import get_scraping_engine
+            if not SCRAPLING_AVAILABLE:
+                logger.error("Scrapling not available. Install with: pip install 'scrapling[all]>=0.3.7' && scrapling install")
+                return False
             
-            self.scraper = await get_scraping_engine()
-            self.scraper_type = "http"
+            logger.info("Initializing Scrapling scraper...")
+            self.scraper = await get_scrapling_service()
+            self.scraper_type = "scrapling"
             self.initialized = True
-            logger.info("✅ HTTP scraper initialized successfully")
+            logger.info("✅ Scrapling scraper initialized successfully")
             return True
+            
         except Exception as e:
-            logger.error(f"Failed to initialize any scraper: {e}")
+            logger.error(f"Failed to initialize Scrapling scraper: {e}")
+            logger.error("Install Scrapling with: pip install 'scrapling[all]>=0.3.7' && scrapling install")
             return False
     
     async def scrape_marketplace(
         self,
         marketplace: str,
         search_query: Optional[str] = None,
-        event_url: Optional[str] = None
+        event_url: Optional[str] = None,
+        adaptive: bool = False
     ) -> Dict[str, Any]:
         """
-        Scrape a marketplace with automatic fallback
+        Scrape a marketplace using Scrapling
         
         Args:
             marketplace: Name of marketplace (stubhub, seatgeek, etc)
             search_query: Search term for events
             event_url: Direct URL to event page
+            adaptive: Use adaptive element tracking (True if website structure changed)
             
         Returns:
             Dictionary with scraping results
@@ -106,45 +92,18 @@ class ScrapingService:
                 'status': 'error',
                 'platform': marketplace.lower(),
                 'listings': [],
-                'error': 'Failed to initialize any scraping method. Please install Playwright: pip install playwright && playwright install chromium',
+                'error': 'Failed to initialize Scrapling. Install with: pip install "scrapling[all]>=0.3.7" && scrapling install',
                 'timestamp': datetime.now().isoformat()
             }
         
         try:
-            marketplace_lower = marketplace.lower()
-            
-            # Route to appropriate scraper method
-            if self.scraper_type == "playwright":
-                if marketplace_lower == 'stubhub':
-                    result = await self.scraper.scrape_stubhub(
-                        event_url=event_url,
-                        search_query=search_query
-                    )
-                elif marketplace_lower == 'seatgeek':
-                    result = await self.scraper.scrape_seatgeek(
-                        event_url=event_url,
-                        search_query=search_query
-                    )
-                elif marketplace_lower == 'ticketmaster':
-                    result = await self.scraper.scrape_ticketmaster(
-                        event_url=event_url,
-                        search_query=search_query
-                    )
-                else:
-                    result = {
-                        'status': 'error',
-                        'error': f'Unsupported marketplace: {marketplace}'
-                    }
-            else:
-                # HTTP-based scraper
-                # Note: HTTP scraper might have different capabilities
-                result = {
-                    'status': 'warning',
-                    'platform': marketplace_lower,
-                    'listings': [],
-                    'message': 'HTTP scraper has limited capabilities. Install Playwright for full functionality.',
-                    'timestamp': datetime.now().isoformat()
-                }
+            # Use Scrapling service
+            result = await self.scraper.scrape_marketplace(
+                marketplace=marketplace,
+                search_query=search_query,
+                event_url=event_url,
+                adaptive=adaptive
+            )
             
             return result
             
@@ -184,20 +143,19 @@ class ScrapingService:
         if not self.initialized:
             return []
         
-        if self.scraper_type == "playwright":
-            return [
-                'stubhub',
-                'seatgeek',
-                'ticketmaster',
-                'javascript_rendering',
-                'anti_detection',
-                'human_simulation'
-            ]
-        else:
-            return [
-                'basic_http',
-                'static_content'
-            ]
+        return [
+            'stubhub',
+            'seatgeek',
+            'ticketmaster',
+            'vividseats',
+            'adaptive_tracking',      # Survives website changes!
+            'cloudflare_bypass',      # Built-in Cloudflare bypass
+            'tls_fingerprinting',     # Browser impersonation
+            'fast_parsing',           # 685x faster than BeautifulSoup
+            'javascript_rendering',
+            'anti_detection',
+            'human_simulation'
+        ]
 
 
 # Global instance
@@ -218,15 +176,17 @@ async def get_scraping_service() -> ScrapingService:
 async def scrape_tickets(
     marketplace: str,
     search_query: Optional[str] = None,
-    event_url: Optional[str] = None
+    event_url: Optional[str] = None,
+    adaptive: bool = False
 ) -> Dict[str, Any]:
     """
-    Convenience function for quick scraping
+    Convenience function for quick scraping with Scrapling
     
     Args:
-        marketplace: Marketplace name (stubhub, seatgeek, ticketmaster)
+        marketplace: Marketplace name (stubhub, seatgeek, ticketmaster, vividseats)
         search_query: Search query string
         event_url: Direct event URL
+        adaptive: Use adaptive element tracking (True if website structure changed)
         
     Returns:
         Scraping results dictionary
@@ -235,5 +195,6 @@ async def scrape_tickets(
     return await service.scrape_marketplace(
         marketplace=marketplace,
         search_query=search_query,
-        event_url=event_url
+        event_url=event_url,
+        adaptive=adaptive
     )

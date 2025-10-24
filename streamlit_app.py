@@ -29,9 +29,13 @@ sys.path.insert(0, str(backend_path))
 
 # Import backend services
 BACKEND_AVAILABLE = False
+SCRAPLING_AVAILABLE = False
 try:
-    # Try to import but don't fail if not available
-    from app.services.enhanced_scraping import get_scraping_engine, ScrapingResult
+    # Import Scrapling-powered scraping service
+    from app.services.scraping_service import scrape_tickets, get_scraping_service
+    from app.services.scrapling_service import SCRAPLING_AVAILABLE
+    
+    # Import other ML/AI services
     from app.services.enhanced_ml_models import (
         AdvancedStackingEnsemble,
         OptimizedRandomForestModel,
@@ -53,8 +57,9 @@ try:
     
     BACKEND_AVAILABLE = True
 except ImportError as e:
-    # For now, use mock data - backend imports will be wired up later
+    # Backend services not available
     BACKEND_AVAILABLE = False
+    SCRAPLING_AVAILABLE = False
     import warnings
     warnings.warn(f"Backend services not fully available: {e}. Using mock data for testing.")
 
@@ -218,7 +223,10 @@ def show_home():
         st.markdown("**Backend Services**")
         if BACKEND_AVAILABLE:
             st.success("✅ Backend services loaded successfully")
-            st.success("✅ Enhanced scraping available")
+            if SCRAPLING_AVAILABLE:
+                st.success("✅ Scrapling scraping available (685x faster!)")
+            else:
+                st.warning("⚠️ Scrapling not installed - install with: pip install 'scrapling[all]' && scrapling install")
             st.success("✅ ML models available")
             st.success("✅ Demand forecasting available")
             st.success("✅ Dynamic pricing available")
@@ -306,14 +314,27 @@ def show_home():
 
 def show_scraping():
     """Data collection and scraping page"""
-    st.markdown('<p class="main-header">🕷️ Data Collection & Scraping</p>', unsafe_allow_html=True)
-    st.markdown("**Real-time web scraping** from live ticket marketplaces")
-    st.info("ℹ️ This uses actual scraping with anti-detection. Results are REAL ticket prices.")
+    st.markdown('<p class="main-header">🕷️ Data Collection & Scraping (Scrapling-Powered)</p>', unsafe_allow_html=True)
+    st.markdown("**Real-time web scraping** from live ticket marketplaces using **Scrapling**")
+    
+    if SCRAPLING_AVAILABLE:
+        st.success("✅ Using Scrapling - 685x faster parsing with adaptive element tracking!")
+        st.info("🎯 **Adaptive tracking enabled**: Scrapling survives website structure changes automatically")
+    else:
+        st.warning("⚠️ Scrapling not installed. Install with:")
+        st.code("pip install 'scrapling[all]>=0.3.7'\nscrapling install")
+    
+    st.info("ℹ️ Features: Cloudflare bypass, TLS fingerprinting, anti-bot detection")
     st.markdown("---")
     
     if not BACKEND_AVAILABLE:
         st.error("Backend services not available. Please check your installation.")
-        st.code("pip install -r backend/requirements.txt")
+        st.code("pip install -r backend/requirements.txt\npip install 'scrapling[all]>=0.3.7'\nscrapling install")
+        return
+    
+    if not SCRAPLING_AVAILABLE:
+        st.error("❌ Scrapling not installed - scraping will not work")
+        st.code("pip install 'scrapling[all]>=0.3.7'\nscrapling install")
         return
     
     # Marketplace selection
@@ -324,8 +345,8 @@ def show_scraping():
     with col1:
         marketplace = st.selectbox(
             "Choose marketplace to scrape",
-            ["StubHub", "SeatGeek"],
-            help="Start with 1-2 marketplaces for testing"
+            ["StubHub", "SeatGeek", "Ticketmaster", "VividSeats"],
+            help="Scrapling supports all major marketplaces"
         )
     
     with col2:
@@ -335,8 +356,15 @@ def show_scraping():
             help="Enter team name or event"
         )
     
+    # Adaptive tracking option (Scrapling's killer feature!)
+    adaptive_mode = st.checkbox(
+        "🎯 Use Adaptive Tracking",
+        value=False,
+        help="Enable if website structure has changed. Scrapling will automatically find elements!"
+    )
+    
     # Scraping configuration
-    with st.expander("⚙️ Scraping Configuration", expanded=False):
+    with st.expander("⚙️ Advanced Scraping Configuration", expanded=False):
         col1, col2, col3 = st.columns(3)
         
         with col1:
@@ -364,8 +392,8 @@ def show_scraping():
     
     # Scrape button
     if st.button("🚀 Start Scraping", type="primary"):
-        with st.spinner(f"Scraping {marketplace} for '{search_query}'..."):
-            result = run_scraping(marketplace, search_query)
+        with st.spinner(f"Scraping {marketplace} for '{search_query}' with Scrapling..."):
+            result = run_scraping(marketplace, search_query, adaptive_mode)
             
             if result:
                 st.session_state.scraping_results.append(result)
@@ -432,8 +460,8 @@ def show_scraping():
         st.dataframe(df_history, width="stretch")
 
 
-def run_scraping(marketplace: str, search_query: str) -> Dict[str, Any]:
-    """Run real scraping task using backend services"""
+def run_scraping(marketplace: str, search_query: str, adaptive: bool = False) -> Dict[str, Any]:
+    """Run real scraping task using Scrapling-powered backend services"""
     try:
         if not BACKEND_AVAILABLE:
             return {
@@ -444,16 +472,24 @@ def run_scraping(marketplace: str, search_query: str) -> Dict[str, Any]:
                 'timestamp': datetime.now().isoformat()
             }
         
-        # Use unified scraping service
+        if not SCRAPLING_AVAILABLE:
+            return {
+                'status': 'error',
+                'platform': marketplace.lower(),
+                'listings': [],
+                'error': 'Scrapling not installed. Install with: pip install "scrapling[all]>=0.3.7" && scrapling install',
+                'timestamp': datetime.now().isoformat()
+            }
+        
+        # Use Scrapling-powered scraping service
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
         async def scrape():
-            from app.services.scraping_service import scrape_tickets
-            
             result = await scrape_tickets(
                 marketplace=marketplace,
-                search_query=search_query
+                search_query=search_query,
+                adaptive=adaptive
             )
             
             return result
