@@ -159,34 +159,78 @@ class ScraplingScrapingService:
                         'timestamp': datetime.now().isoformat()
                     }
                 
-                # Search for events
-                search_url = f'https://www.stubhub.com/find/s/?q={search_query}'
+                # Search for events on StubHub
+                # StubHub structure: performer pages list all events for a team/artist
+                import urllib.parse
+                encoded_query = urllib.parse.quote(search_query)
+                
+                # Try multiple URL formats for StubHub
+                # 1. Direct performer page (most reliable)
+                # 2. Search results page
+                performer_slug = search_query.lower().replace(' ', '-')
+                search_urls = [
+                    f'https://www.stubhub.com/{performer_slug}-tickets/performer/5937/',  # Known Timberwolves ID
+                    f'https://www.stubhub.com/{performer_slug}-tickets',
+                    f'https://www.stubhub.com/find?q={encoded_query}',
+                ]
+                
                 logger.info(f"Searching StubHub for: {search_query}")
-                logger.info(f"Search URL: {search_url}")
                 
-                def fetch_search():
-                    return StealthyFetcher.fetch(
-                        search_url,
-                        headless=True,
-                        solve_cloudflare=True,
-                        google_search=False,
-                        network_idle=True
-                    )
+                search_page = None
+                successful_url = None
                 
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    search_page = await loop.run_in_executor(executor, fetch_search)
+                for search_url in search_urls:
+                    try:
+                        logger.info(f"Trying URL: {search_url}")
+                        
+                        def fetch_search():
+                            return StealthyFetcher.fetch(
+                                search_url,
+                                headless=True,
+                                solve_cloudflare=True,
+                                google_search=False,
+                                network_idle=True
+                            )
+                        
+                        with concurrent.futures.ThreadPoolExecutor() as executor:
+                            page = await loop.run_in_executor(executor, fetch_search)
+                        
+                        # Check if page loaded successfully (not a 404)
+                        # We can check this by looking for event links
+                        test_links = page.css('a[href*="/event/"], a[data-testid*="event"]')
+                        if test_links:
+                            search_page = page
+                            successful_url = search_url
+                            logger.info(f"Successfully loaded page with events: {search_url}")
+                            break
+                        else:
+                            logger.info(f"Page loaded but no events found: {search_url}")
+                    except Exception as e:
+                        logger.debug(f"Failed to load {search_url}: {e}")
+                        continue
                 
-                # Find event links on search results page
-                # StubHub uses various selectors for event cards
-                event_links = search_page.css('a[href*="/event/"], a[data-testid*="event"], .eventCard a, .event-card a')
-                
-                if not event_links:
-                    logger.warning(f"No event links found on search page for: {search_query}")
-                    # Return empty but successful result - no current events
+                if not search_page:
+                    logger.warning(f"Could not load any StubHub page for: {search_query}")
                     return {
                         'status': 'success',
                         'platform': 'stubhub',
-                        'url': search_url,
+                        'url': search_urls[0],
+                        'listings': [],
+                        'count': 0,
+                        'timestamp': datetime.now().isoformat(),
+                        'scraper': 'scrapling',
+                        'message': f'Could not find events page for "{search_query}". URLs tried: {len(search_urls)}'
+                    }
+                
+                # Find event links on the page
+                event_links = search_page.css('a[href*="/event/"], a[data-testid*="event"], .eventCard a, .event-card a')
+                
+                if not event_links:
+                    logger.warning(f"No event links found for: {search_query}")
+                    return {
+                        'status': 'success',
+                        'platform': 'stubhub',
+                        'url': successful_url,
                         'listings': [],
                         'count': 0,
                         'timestamp': datetime.now().isoformat(),
@@ -343,31 +387,71 @@ class ScraplingScrapingService:
                         'timestamp': datetime.now().isoformat()
                     }
                 
-                # Search for events
-                search_url = f'https://seatgeek.com/search?q={search_query}'
+                # Search for events on SeatGeek
+                import urllib.parse
+                encoded_query = urllib.parse.quote(search_query)
+                
+                # Try multiple URL formats for SeatGeek
+                performer_slug = search_query.lower().replace(' ', '-')
+                search_urls = [
+                    f'https://seatgeek.com/{performer_slug}-tickets',
+                    f'https://seatgeek.com/search?q={encoded_query}',
+                ]
+                
                 logger.info(f"Searching SeatGeek for: {search_query}")
-                logger.info(f"Search URL: {search_url}")
                 
-                def fetch_search():
-                    return StealthyFetcher.fetch(
-                        search_url,
-                        headless=True,
-                        network_idle=True
-                    )
+                search_page = None
+                successful_url = None
                 
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    search_page = await loop.run_in_executor(executor, fetch_search)
+                for search_url in search_urls:
+                    try:
+                        logger.info(f"Trying URL: {search_url}")
+                        
+                        def fetch_search():
+                            return StealthyFetcher.fetch(
+                                search_url,
+                                headless=True,
+                                network_idle=True
+                            )
+                        
+                        with concurrent.futures.ThreadPoolExecutor() as executor:
+                            page = await loop.run_in_executor(executor, fetch_search)
+                        
+                        # Check if page loaded successfully
+                        test_links = page.css('a[href*="/event/"], a[href*="-tickets-"]')
+                        if test_links:
+                            search_page = page
+                            successful_url = search_url
+                            logger.info(f"Successfully loaded page with events: {search_url}")
+                            break
+                        else:
+                            logger.info(f"Page loaded but no events found: {search_url}")
+                    except Exception as e:
+                        logger.debug(f"Failed to load {search_url}: {e}")
+                        continue
                 
-                # Find event links on search results page
-                # SeatGeek uses various selectors for event cards
-                event_links = search_page.css('a[href*="/event/"], a[href*="-tickets-"], .event-card a, .EventCard a')
-                
-                if not event_links:
-                    logger.warning(f"No event links found on search page for: {search_query}")
+                if not search_page:
+                    logger.warning(f"Could not load any SeatGeek page for: {search_query}")
                     return {
                         'status': 'success',
                         'platform': 'seatgeek',
-                        'url': search_url,
+                        'url': search_urls[0],
+                        'listings': [],
+                        'count': 0,
+                        'timestamp': datetime.now().isoformat(),
+                        'scraper': 'scrapling',
+                        'message': f'Could not find events page for "{search_query}"'
+                    }
+                
+                # Find event links on the page
+                event_links = search_page.css('a[href*="/event/"], a[href*="-tickets-"], .event-card a, .EventCard a')
+                
+                if not event_links:
+                    logger.warning(f"No event links found for: {search_query}")
+                    return {
+                        'status': 'success',
+                        'platform': 'seatgeek',
+                        'url': successful_url,
                         'listings': [],
                         'count': 0,
                         'timestamp': datetime.now().isoformat(),
