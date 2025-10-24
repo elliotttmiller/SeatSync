@@ -4,6 +4,16 @@
 
 The SeatSync scraping system has been refactored to provide a clean, efficient, and robust ticket price collection system with automatic fallbacks and improved error handling.
 
+**🆕 NEW: Scrapling Integration Available!**
+
+SeatSync now supports Scrapling, a modern adaptive web scraping library that offers:
+- **685x faster parsing** than BeautifulSoup
+- **Adaptive element tracking** - survives website structure changes
+- **Built-in Cloudflare bypass** and anti-bot detection
+- **TLS fingerprint impersonation** for better stealth
+
+See `SCRAPLING_ANALYSIS.md` and `SCRAPLING_MIGRATION_GUIDE.md` for details.
+
 ## Key Improvements
 
 ### 1. **Unified Scraping Interface**

@@ -38,6 +38,8 @@ aiohttp>=3.8.0
 playwright>=1.40.0
 beautifulsoup4>=4.12.0
 lxml>=5.0.0
+# Scrapling - Modern adaptive web scraping (optional, enable with USE_SCRAPLING=true)
+# Uncomment to use: scrapling[all]>=0.3.7
 # Streamlit for development UI
 streamlit>=1.28.0
 plotly>=5.18.0 

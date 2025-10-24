@@ -3,21 +3,26 @@ Unified Scraping Service
 Provides a clean, simple interface for all ticket scraping operations
 
 This service:
-- Auto-detects available scraping methods (Playwright vs HTTP)
+- Auto-detects available scraping methods (Playwright vs HTTP vs Scrapling)
 - Provides graceful fallbacks
 - Handles initialization automatically
 - Manages resource cleanup
 - Provides consistent error handling
 - Handles Windows-specific asyncio issues
+- Supports feature flag for Scrapling (modern, adaptive scraping)
 """
 
 import logging
 import sys
+import os
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 import asyncio
 
 logger = logging.getLogger(__name__)
+
+# Feature flag for Scrapling - can be controlled via environment variable
+USE_SCRAPLING = os.getenv('USE_SCRAPLING', 'false').lower() == 'true'
 
 
 # Fix Windows asyncio issue with Playwright
@@ -43,12 +48,29 @@ class ScrapingService:
     async def initialize(self) -> bool:
         """
         Initialize the best available scraper
-        Tries Playwright first, falls back to HTTP if needed
+        Priority: Scrapling (if enabled) > Playwright > HTTP
         """
         if self.initialized:
             return True
         
-        # Try Playwright-based scraper first
+        # Try Scrapling first if feature flag is enabled
+        if USE_SCRAPLING:
+            try:
+                from .scrapling_service import get_scrapling_service, SCRAPLING_AVAILABLE
+                
+                if SCRAPLING_AVAILABLE:
+                    logger.info("Initializing Scrapling-based scraper (modern, adaptive)...")
+                    self.scraper = await get_scrapling_service()
+                    self.scraper_type = "scrapling"
+                    self.initialized = True
+                    logger.info("✅ Scrapling scraper initialized successfully")
+                    return True
+                else:
+                    logger.warning("Scrapling not available, falling back to Playwright")
+            except Exception as e:
+                logger.warning(f"Could not initialize Scrapling scraper: {e}")
+        
+        # Try Playwright-based scraper
         try:
             from .advanced_ticket_scraper import AdvancedTicketScraper, PLAYWRIGHT_AVAILABLE
             
