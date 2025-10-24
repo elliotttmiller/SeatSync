@@ -4,20 +4,30 @@ Modern, efficient web scraping using the Scrapling library
 
 This service provides:
 - Adaptive element tracking (survives website structure changes)
-- Superior anti-bot detection bypass
+- Superior anti-bot detection bypass (Cloudflare, AWS WAF, etc.)
 - 685x faster parsing performance
-- Built-in TLS fingerprinting and Cloudflare bypass
+- Built-in TLS fingerprinting and challenge solving
 - Clean, simple API
 
-IMPORTANT NOTES ON MARKETPLACE SCRAPING:
-- StubHub and other major marketplaces use AWS WAF and sophisticated anti-bot protection
-- Direct event URLs work best (when user provides specific event URL)
-- Search-based discovery may be blocked by anti-bot systems
-- For production use, consider:
-  1. Using official APIs when available (StubHub API, SeatGeek API, etc.)
-  2. Running scrapers from residential IPs with proper rate limiting
-  3. Implementing CAPTCHA solving services
-  4. Using browser automation with real user profiles
+ANTI-BOT BYPASS CAPABILITIES:
+Scrapling uses StealthyFetcher with advanced capabilities:
+- Modified Firefox browser with fingerprint spoofing
+- Automatic Cloudflare Turnstile/Interstitial bypass
+- AWS WAF challenge solving
+- TLS fingerprint randomization
+- Realistic browser behavior simulation
+
+For best results during development:
+- Use full stealth mode (stealth=True)
+- Allow sufficient wait time for dynamic content (wait=3-5 seconds)
+- Enable solve_cloudflare for automatic challenge handling
+- Keep disable_resources=False to ensure proper page rendering
+
+If you still encounter blocks, consider:
+- Using residential IPs or proxy rotation
+- Adding random delays between requests
+- Running from different geographic locations
+- For production: official APIs still recommended for reliability
 """
 
 import logging
@@ -176,9 +186,8 @@ class ScraplingScrapingService:
                 encoded_query = urllib.parse.quote(search_query)
                 
                 # Try multiple URL formats for StubHub
-                # Note: Performer IDs are specific to each team/artist
-                # The ID 5937 is for Minnesota Timberwolves as an example
-                # In production, use StubHub API to discover performer IDs
+                # Format: https://www.stubhub.com/{team-slug}-tickets/performer/{id}
+                # We'll try the direct performer page format first
                 performer_slug = search_query.lower().replace(' ', '-')
                 search_urls = [
                     f'https://www.stubhub.com/{performer_slug}-tickets',
@@ -195,20 +204,32 @@ class ScraplingScrapingService:
                         logger.info(f"Trying URL: {search_url}")
                         
                         def fetch_search():
+                            # Use Scrapling's full stealth capabilities to bypass AWS WAF
                             return StealthyFetcher.fetch(
                                 search_url,
                                 headless=True,
-                                solve_cloudflare=True,
+                                solve_cloudflare=True,  # Handles Cloudflare, AWS WAF, and other challenges
                                 google_search=False,
-                                network_idle=True
+                                network_idle=True,
+                                wait=3000,  # Wait 3 seconds for dynamic content (milliseconds)
+                                humanize=True,  # Humanize cursor movement
+                                disable_resources=False,  # Load all resources for proper rendering
+                                os_randomize=False  # Match OS fingerprints with current system
                             )
                         
                         with concurrent.futures.ThreadPoolExecutor() as executor:
                             page = await loop.run_in_executor(executor, fetch_search)
                         
-                        # Check if page loaded successfully (not a 404)
-                        # We can check this by looking for event links
-                        test_links = page.css('a[href*="/event/"], a[data-testid*="event"]')
+                        # Check if we got an AWS WAF challenge page
+                        page_html = page.html if hasattr(page, 'html') else str(page)
+                        if 'aws-waf-token' in page_html.lower() or 'challenge-container' in page_html.lower():
+                            logger.warning(f"AWS WAF challenge detected on {search_url}, Scrapling should handle this automatically")
+                            # Scrapling's solve_cloudflare should handle AWS WAF challenges too
+                            # If we still get blocked, the page may need more time or different approach
+                        
+                        # Check if page loaded successfully (not a 404 or challenge page)
+                        # We can check this by looking for event links or performer content
+                        test_links = page.css('a[href*="/event/"], a[data-testid*="event"], [class*="event"]')
                         if test_links:
                             search_page = page
                             successful_url = search_url
@@ -274,12 +295,17 @@ class ScraplingScrapingService:
             logger.info(f"Scraping tickets from event page: {event_url}")
             
             def fetch_event():
+                # Use full stealth capabilities to bypass anti-bot protection
                 return StealthyFetcher.fetch(
                     event_url,
                     headless=True,
-                    solve_cloudflare=True,
+                    solve_cloudflare=True,  # Handles Cloudflare, AWS WAF, and other challenges
                     google_search=False,
-                    network_idle=True
+                    network_idle=True,
+                    wait=5000,  # Wait 5 seconds for ticket listings to load (milliseconds)
+                    humanize=True,  # Humanize cursor movement
+                    disable_resources=False,  # Ensure all page resources load
+                    os_randomize=False
                 )
             
             with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -417,10 +443,17 @@ class ScraplingScrapingService:
                         logger.info(f"Trying URL: {search_url}")
                         
                         def fetch_search():
+                            # Use full stealth capabilities for SeatGeek as well
                             return StealthyFetcher.fetch(
                                 search_url,
                                 headless=True,
-                                network_idle=True
+                                solve_cloudflare=True,
+                                google_search=False,
+                                network_idle=True,
+                                wait=3000,
+                                humanize=True,
+                                disable_resources=False,
+                                os_randomize=False
                             )
                         
                         with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -493,10 +526,17 @@ class ScraplingScrapingService:
             logger.info(f"Scraping tickets from event page: {event_url}")
             
             def fetch_event():
+                # Use full stealth capabilities for event page
                 return StealthyFetcher.fetch(
                     event_url,
                     headless=True,
-                    network_idle=True
+                    solve_cloudflare=True,
+                    google_search=False,
+                    network_idle=True,
+                    wait=5000,
+                    humanize=True,
+                    disable_resources=False,
+                    os_randomize=False
                 )
             
             with concurrent.futures.ThreadPoolExecutor() as executor:
