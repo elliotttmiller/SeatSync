@@ -151,15 +151,22 @@ class ScraplingScrapingService:
             
             logger.info(f"Scraping StubHub with Scrapling: {url}")
             
-            # Use StealthyFetcher with Cloudflare bypass
-            # This is a one-off request - for production, consider using StealthySession
-            page = StealthyFetcher.fetch(
-                url,
-                headless=True,
-                solve_cloudflare=True,  # Auto-bypass Cloudflare!
-                google_search=False,
-                network_idle=True
-            )
+            # Run Scrapling's sync fetch in a thread pool to avoid blocking the event loop
+            import concurrent.futures
+            loop = asyncio.get_event_loop()
+            
+            def fetch_sync():
+                # Use StealthyFetcher with Cloudflare bypass
+                return StealthyFetcher.fetch(
+                    url,
+                    headless=True,
+                    solve_cloudflare=True,  # Auto-bypass Cloudflare!
+                    google_search=False,
+                    network_idle=True
+                )
+            
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                page = await loop.run_in_executor(executor, fetch_sync)
             
             # Extract listings using adaptive selection if enabled
             # Scrapling's adaptive feature will find elements even if selectors change!
@@ -239,7 +246,15 @@ class ScraplingScrapingService:
             url = event_url or f'https://seatgeek.com/search?q={search_query or "sports"}'
             logger.info(f"Scraping SeatGeek with Scrapling: {url}")
             
-            page = StealthyFetcher.fetch(url, headless=True, network_idle=True)
+            # Run in thread pool
+            import concurrent.futures
+            loop = asyncio.get_event_loop()
+            
+            def fetch_sync():
+                return StealthyFetcher.fetch(url, headless=True, network_idle=True)
+            
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                page = await loop.run_in_executor(executor, fetch_sync)
             
             # Use adaptive selection
             listing_elements = page.css(
@@ -300,7 +315,15 @@ class ScraplingScrapingService:
             url = event_url or f'https://www.ticketmaster.com/search?q={search_query or "sports"}'
             logger.info(f"Scraping Ticketmaster with Scrapling: {url}")
             
-            page = StealthyFetcher.fetch(url, headless=True, network_idle=True)
+            # Run in thread pool
+            import concurrent.futures
+            loop = asyncio.get_event_loop()
+            
+            def fetch_sync():
+                return StealthyFetcher.fetch(url, headless=True, network_idle=True)
+            
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                page = await loop.run_in_executor(executor, fetch_sync)
             
             listing_elements = page.css(
                 '[data-testid="event-card"], .event-card, .offer',
@@ -360,7 +383,15 @@ class ScraplingScrapingService:
             url = event_url or f'https://www.vividseats.com/search?search={search_query or "sports"}'
             logger.info(f"Scraping Vivid Seats with Scrapling: {url}")
             
-            page = StealthyFetcher.fetch(url, headless=True, network_idle=True)
+            # Run in thread pool
+            import concurrent.futures
+            loop = asyncio.get_event_loop()
+            
+            def fetch_sync():
+                return StealthyFetcher.fetch(url, headless=True, network_idle=True)
+            
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                page = await loop.run_in_executor(executor, fetch_sync)
             
             listing_elements = page.css(
                 '[data-testid="listing"], .listing, .productionListItem',
