@@ -1,0 +1,90 @@
+rules_version = '2';
+
+// Firebase Storage Security Rules for SeatSync
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isValidImageFile() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    
+    function isValidFileSize(maxSizeMB) {
+      return request.resource.size < maxSizeMB * 1024 * 1024;
+    }
+    
+    // User profile images
+    match /users/{userId}/profile/{fileName} {
+      // Read: Owner or authenticated users
+      allow read: if isAuthenticated();
+      // Write: Owner only, must be image under 5MB
+      allow write: if isOwner(userId) && 
+                      isValidImageFile() && 
+                      isValidFileSize(5);
+    }
+    
+    // Ticket images/attachments
+    match /tickets/{ticketId}/{fileName} {
+      // Read: All authenticated users (for marketplace)
+      allow read: if isAuthenticated();
+      // Write: Authenticated users, images under 10MB
+      allow write: if isAuthenticated() && 
+                      isValidImageFile() && 
+                      isValidFileSize(10);
+    }
+    
+    // Event images
+    match /events/{eventId}/{fileName} {
+      // Read: Public
+      allow read: if true;
+      // Write: Admin only (managed by backend)
+      allow write: if false;
+    }
+    
+    // ML Model artifacts (trained models, data exports)
+    match /ml_models/{userId}/{fileName} {
+      // Read: Owner only
+      allow read: if isOwner(userId);
+      // Write: Owner only, up to 100MB
+      allow write: if isOwner(userId) && 
+                      isValidFileSize(100);
+    }
+    
+    // Report exports (CSV, PDF, etc.)
+    match /reports/{userId}/{fileName} {
+      // Read: Owner only
+      allow read: if isOwner(userId);
+      // Write: Owner only, up to 50MB
+      allow write: if isOwner(userId) && 
+                      isValidFileSize(50);
+    }
+    
+    // Data exports
+    match /exports/{userId}/{fileName} {
+      // Read: Owner only
+      allow read: if isOwner(userId);
+      // Write: System generated (backend only)
+      allow write: if false;
+    }
+    
+    // Public assets (logos, static images)
+    match /public/{fileName} {
+      // Read: Public
+      allow read: if true;
+      // Write: Admin only (managed by backend)
+      allow write: if false;
+    }
+    
+    // Default deny all other paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

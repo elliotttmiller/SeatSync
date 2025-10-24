@@ -52,11 +52,16 @@ build/
 .env.production.local
 
 # IDEs
-.vscode/
 .idea/
 *.swp
 *.swo
 *~
+# VS Code - Allow configuration files for Firebase Studio
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 
 # OS
 .DS_Store
@@ -282,8 +287,7 @@ cython_debug/
 # PyCharm
 .idea/
 
-# VS Code
-.vscode/
+# VS Code - Already configured above
 
 # macOS
 .DS_Store
@@ -311,4 +315,29 @@ alembic/versions/*.pyc
 alembic/versions/__pycache__/
 
 # Jupyter
-notebooks/ 
+notebooks/
+
+# Firebase
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+.runtimeconfig.json
+
+# Google Cloud
+.gcloud/
+gcloud-credentials.json
+service-account-key.json
+
+# IDX / Firebase Studio - keep configuration files only
+.idx/*
+!.idx/dev.nix
+!.idx/icon.png
+!.idx/validate-config.sh
+!.idx/*.md
+.idx/.idx/
+
+# Nix
+result
+result-*
+.nix-profile/
+.nix-defexpr/ 

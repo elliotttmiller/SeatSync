@@ -1,0 +1,128 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      // Users can read their own data
+      allow read: if isOwner(userId) || isAdmin();
+      // Users can create their own account
+      allow create: if isAuthenticated();
+      // Users can update their own data
+      allow update: if isOwner(userId);
+      // Only admins can delete users
+      allow delete: if isAdmin();
+    }
+    
+    // Tickets collection
+    match /tickets/{ticketId} {
+      // Anyone can read tickets (for marketplace browsing)
+      allow read: if true;
+      // Authenticated users can create tickets
+      allow create: if isAuthenticated();
+      // Owners can update their tickets
+      allow update: if isAuthenticated() && 
+                       resource.data.userId == request.auth.uid;
+      // Owners and admins can delete tickets
+      allow delete: if isAuthenticated() && 
+                       (resource.data.userId == request.auth.uid || isAdmin());
+    }
+    
+    // Events collection
+    match /events/{eventId} {
+      // Anyone can read events
+      allow read: if true;
+      // Only authenticated users with appropriate permissions can write
+      allow write: if isAdmin();
+    }
+    
+    // Predictions collection
+    match /predictions/{predictionId} {
+      // Users can read their own predictions
+      allow read: if isAuthenticated() && 
+                     resource.data.userId == request.auth.uid;
+      // System can create predictions
+      allow create: if isAuthenticated();
+      // No updates or deletes allowed
+      allow update, delete: if false;
+    }
+    
+    // Trading strategies collection
+    match /trading_strategies/{strategyId} {
+      // Users can read their own strategies
+      allow read: if isAuthenticated() && 
+                     resource.data.userId == request.auth.uid;
+      // Users can create their own strategies
+      allow create: if isAuthenticated();
+      // Users can update their own strategies
+      allow update: if isAuthenticated() && 
+                       resource.data.userId == request.auth.uid;
+      // Users can delete their own strategies
+      allow delete: if isAuthenticated() && 
+                       resource.data.userId == request.auth.uid;
+    }
+    
+    // Portfolio collection
+    match /portfolios/{portfolioId} {
+      // Users can read their own portfolio
+      allow read: if isAuthenticated() && 
+                     resource.data.userId == request.auth.uid;
+      // Users can create their own portfolio
+      allow create: if isAuthenticated();
+      // Users can update their own portfolio
+      allow update: if isAuthenticated() && 
+                       resource.data.userId == request.auth.uid;
+      // Users can delete their own portfolio
+      allow delete: if isAuthenticated() && 
+                       resource.data.userId == request.auth.uid;
+    }
+    
+    // Market data collection (read-only for users, write for system)
+    match /market_data/{dataId} {
+      allow read: if true;
+      allow write: if false; // Only backend service can write
+    }
+    
+    // Analytics collection
+    match /analytics/{analyticsId} {
+      // Users can read aggregate analytics
+      allow read: if isAuthenticated();
+      // Only system can write analytics
+      allow write: if false;
+    }
+    
+    // Automation rules collection
+    match /automation_rules/{ruleId} {
+      // Users can read their own rules
+      allow read: if isAuthenticated() && 
+                     resource.data.userId == request.auth.uid;
+      // Users can create their own rules
+      allow create: if isAuthenticated();
+      // Users can update their own rules
+      allow update: if isAuthenticated() && 
+                       resource.data.userId == request.auth.uid;
+      // Users can delete their own rules
+      allow delete: if isAuthenticated() && 
+                       resource.data.userId == request.auth.uid;
+    }
+    
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
