@@ -8,6 +8,16 @@ This service provides:
 - 685x faster parsing performance
 - Built-in TLS fingerprinting and Cloudflare bypass
 - Clean, simple API
+
+IMPORTANT NOTES ON MARKETPLACE SCRAPING:
+- StubHub and other major marketplaces use AWS WAF and sophisticated anti-bot protection
+- Direct event URLs work best (when user provides specific event URL)
+- Search-based discovery may be blocked by anti-bot systems
+- For production use, consider:
+  1. Using official APIs when available (StubHub API, SeatGeek API, etc.)
+  2. Running scrapers from residential IPs with proper rate limiting
+  3. Implementing CAPTCHA solving services
+  4. Using browser automation with real user profiles
 """
 
 import logging
