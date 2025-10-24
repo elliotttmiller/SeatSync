@@ -1,7 +1,27 @@
 # SeatSync Backend
 
+[![Open in Firebase Studio](https://img.shields.io/badge/Open%20in-Firebase%20Studio-orange?logo=google&logoColor=white)](https://idx.google.com/import?url=https://github.com/elliotttmiller/SeatSync)
+
 ## Overview
 SeatSync is an **advanced AI-driven platform** for ticket price prediction, market analysis, and automated trading strategies. Powered by cutting-edge ML ensemble models, real-time data collection from 11+ sources, and universal AI model support.
+
+## 🔥 Quick Start with Firebase Studio
+
+Get started in the cloud with zero local setup required!
+
+**[→ Open in Firebase Studio](https://idx.google.com/import?url=https://github.com/elliotttmiller/SeatSync)** ← Click to start!
+
+Firebase Studio provides a complete, pre-configured cloud development environment with:
+- ✅ **No installation needed** - Everything runs in the browser
+- ✅ **Automatic setup** - All dependencies installed automatically
+- ✅ **Instant previews** - Backend, frontend, and dashboard ready in minutes
+- ✅ **Professional IDE** - VS Code with 30+ extensions pre-installed
+- ✅ **Cloud resources** - Fast compute and storage included
+
+**New to Firebase Studio?** Check out:
+- **Quick Start Guide**: [FIREBASE_STUDIO_QUICK_START.md](./FIREBASE_STUDIO_QUICK_START.md) - 5-minute setup
+- **Comprehensive Setup**: [FIREBASE_STUDIO_SETUP.md](./FIREBASE_STUDIO_SETUP.md) - Detailed documentation
+- **Deployment Guide**: [FIREBASE_DEPLOYMENT_GUIDE.md](./FIREBASE_DEPLOYMENT_GUIDE.md) - Production deployment
 
 ## 🎉 Recent Improvements (v2.0)
 
@@ -51,9 +71,22 @@ See [SCRAPING_GUIDE.md](./SCRAPING_GUIDE.md) for complete documentation.
 - **HuggingFace** (Thousands of open models)
 
 ## Setup
-## Setup
 
-### Quick Start (Minimal Configuration)
+### Option 1: Firebase Studio (Recommended)
+**Zero setup required!** Open in Firebase Studio for instant cloud development:
+
+[![Open in Firebase Studio](https://img.shields.io/badge/Open%20in-Firebase%20Studio-orange?logo=google&logoColor=white)](https://idx.google.com/import?url=https://github.com/elliotttmiller/SeatSync)
+
+Everything installs automatically:
+- ✅ Python 3.11+ with all ML/AI libraries
+- ✅ Node.js 20 with React frontend
+- ✅ PostgreSQL database
+- ✅ VS Code with 30+ extensions
+- ✅ Preview servers for backend, frontend, and dashboard
+
+See [FIREBASE_STUDIO_QUICK_START.md](./FIREBASE_STUDIO_QUICK_START.md) for details.
+
+### Option 2: Local Setup (Traditional)
 Works with **FREE** APIs out of the box!
 
 1. Clone the repo and install dependencies:
