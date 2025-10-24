@@ -14,8 +14,9 @@ Get started in the cloud with zero local setup required!
 Firebase Studio provides a complete, pre-configured cloud development environment with:
 - ✅ **No installation needed** - Everything runs in the browser
 - ✅ **Automatic setup** - All dependencies installed automatically
-- ✅ **Instant previews** - Backend, frontend, and dashboard ready in minutes
-- ✅ **Professional IDE** - VS Code with 30+ extensions pre-installed
+- ✅ **Streamlit Dashboard** - Primary development and testing interface
+- ✅ **Backend API** - Production-grade FastAPI server with hot reload
+- ✅ **Professional IDE** - VS Code with Python/ML extensions pre-installed
 - ✅ **Cloud resources** - Fast compute and storage included
 
 **New to Firebase Studio?** Check out:
@@ -35,10 +36,12 @@ Firebase Studio provides a complete, pre-configured cloud development environmen
 
 See [SCRAPING_GUIDE.md](./SCRAPING_GUIDE.md) for complete documentation.
 
-### Streamlit Integration
+### Streamlit Development Interface
+- **Primary Testing UI** - Streamlit app for rapid development and testing
 - **Modern API** - Updated to latest Streamlit conventions
 - **Better UX** - Improved error messages and feedback
 - **Simplified Workflow** - Reduced complexity for common tasks
+- **Production Logic** - Uses the same backend services and integrations
 
 ## 🚀 Key Features
 
@@ -79,10 +82,11 @@ See [SCRAPING_GUIDE.md](./SCRAPING_GUIDE.md) for complete documentation.
 
 Everything installs automatically:
 - ✅ Python 3.11+ with all ML/AI libraries
-- ✅ Node.js 20 with React frontend
 - ✅ PostgreSQL database
-- ✅ VS Code with 30+ extensions
-- ✅ Preview servers for backend, frontend, and dashboard
+- ✅ Streamlit dashboard (primary development interface)
+- ✅ Backend API server with production-grade logic
+- ✅ VS Code with Python/ML extensions
+- ✅ Preview servers for backend and Streamlit dashboard
 
 See [FIREBASE_STUDIO_QUICK_START.md](./FIREBASE_STUDIO_QUICK_START.md) for details.
 
@@ -104,7 +108,12 @@ Works with **FREE** APIs out of the box!
    alembic upgrade head
    ```
 
-4. Start the backend:
+4. Start the Streamlit dashboard:
+   ```sh
+   streamlit run streamlit_app.py
+   ```
+
+   Or start the backend:
    ```sh
    cd backend
    uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload

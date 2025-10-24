@@ -89,24 +89,12 @@
       },
       "envFile": "${workspaceFolder}/.env",
       "justMyCode": false
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "React: Frontend",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "start"
-      ],
-      "cwd": "${workspaceFolder}/frontend",
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen"
     }
   ],
   "compounds": [
     {
-      "name": "Full Stack: Backend + Frontend",
-      "configurations": ["Python: FastAPI Backend", "React: Frontend"],
+      "name": "Backend + Streamlit",
+      "configurations": ["Python: FastAPI Backend", "Python: Streamlit App"],
       "stopAll": true
     }
   ]

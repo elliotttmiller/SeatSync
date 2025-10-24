@@ -4,7 +4,7 @@
     {
       "label": "Setup: Install All Dependencies",
       "type": "shell",
-      "command": "source .venv/bin/activate && pip install -r backend/requirements.txt && cd frontend && npm install",
+      "command": "source .venv/bin/activate && pip install -r backend/requirements.txt",
       "group": {
         "kind": "build",
         "isDefault": false
@@ -19,23 +19,6 @@
       "label": "Backend: Start Server",
       "type": "shell",
       "command": "source .venv/bin/activate && cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
-      "group": {
-        "kind": "test",
-        "isDefault": false
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Frontend: Start Dev Server",
-      "type": "shell",
-      "command": "npm start",
-      "options": {
-        "cwd": "${workspaceFolder}/frontend"
-      },
       "group": {
         "kind": "test",
         "isDefault": false
@@ -78,23 +61,6 @@
       "label": "Test: Run Backend Tests",
       "type": "shell",
       "command": "source .venv/bin/activate && pytest backend/tests/ -v -s",
-      "group": {
-        "kind": "test",
-        "isDefault": false
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Test: Run Frontend Tests",
-      "type": "shell",
-      "command": "npm test",
-      "options": {
-        "cwd": "${workspaceFolder}/frontend"
-      },
       "group": {
         "kind": "test",
         "isDefault": false
@@ -150,37 +116,9 @@
       "problemMatcher": []
     },
     {
-      "label": "Lint: Frontend (ESLint)",
-      "type": "shell",
-      "command": "npm run lint",
-      "options": {
-        "cwd": "${workspaceFolder}/frontend"
-      },
-      "group": "none",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      },
-      "problemMatcher": []
-    },
-    {
       "label": "Format: Python (Black)",
       "type": "shell",
       "command": "source .venv/bin/activate && black backend/app",
-      "group": "none",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Format: Frontend (Prettier)",
-      "type": "shell",
-      "command": "npm run lint:fix",
-      "options": {
-        "cwd": "${workspaceFolder}/frontend"
-      },
       "group": "none",
       "presentation": {
         "reveal": "always",

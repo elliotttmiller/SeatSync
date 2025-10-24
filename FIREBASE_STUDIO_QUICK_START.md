@@ -28,7 +28,6 @@ Firebase Studio will automatically:
 - ✅ Install all system packages (Python, Node.js, databases, etc.)
 - ✅ Create Python virtual environment
 - ✅ Install Python dependencies (~200 packages)
-- ✅ Install Node.js dependencies
 - ✅ Run database migrations
 - ✅ Install browser automation tools
 
@@ -36,47 +35,46 @@ Watch the terminal for progress. When you see "✓ Workspace ready", you're good
 
 ### Step 3: Start Developing
 
+**Streamlit Dashboard** (Primary Development Interface) is automatically running at:
+- URL: Click the "Web Preview" button → Port 8501
+- Or: `https://8501-[your-workspace-url]`
+- **This is your main interface for testing and development**
+
 **Backend API Server** is automatically running at:
 - URL: Click the "Web Preview" button → Port 8000
 - Or: `https://8000-[your-workspace-url]`
-
-**Frontend React App** is automatically running at:
-- URL: Click the "Web Preview" button → Port 3000  
-- Or: `https://3000-[your-workspace-url]`
-
-**Streamlit Dashboard** (optional):
-- Click the terminal menu → "Streamlit" preview
-- Or: `https://8501-[your-workspace-url]`
+- **Production-grade API with all integrations**
 
 ## What's Included?
 
 ### Pre-installed Packages
 - **Python 3.11** with 200+ ML/AI libraries
-- **Node.js 20** with React and modern tooling
 - **PostgreSQL 15** database
+- **Streamlit** for interactive development
 - **Firebase Tools** for deployment
 - **Google Cloud SDK** for cloud integration
 - **Git & GitHub CLI** for version control
 
 ### Pre-configured IDE Extensions
 - Python (Pylance, Black, Flake8)
-- JavaScript/TypeScript/React (ESLint, Prettier)
 - Database tools (SQLTools)
 - Git tools (GitLens, Git Graph)
 - Firebase & Google Cloud tools
-- And 30+ more productivity extensions!
+- And 25+ more productivity extensions!
 
 ### Pre-configured Services
 - PostgreSQL database (auto-starts)
+- Streamlit dashboard (primary interface)
+- Backend API (production logic)
 - Redis cache (optional)
-- Multi-service preview (backend, frontend, streamlit)
+- Multi-service preview (backend and Streamlit)
 
 ## Common Tasks
 
 ### View Logs
 ```bash
 # Backend logs - visible in the "Backend" terminal tab
-# Frontend logs - visible in the "Frontend" terminal tab
+# Streamlit logs - visible in the "Streamlit" terminal tab
 ```
 
 ### Run Tests
@@ -98,7 +96,7 @@ psql -h localhost -U seatsync -d seatsync
 ### Make Code Changes
 - Edit any file - changes auto-reload!
 - Backend: FastAPI auto-reloads
-- Frontend: React hot-reloads
+- Streamlit: Auto-reloads on file save
 - Instant feedback in preview windows
 
 ### Commit Changes
@@ -108,8 +106,7 @@ psql -h localhost -U seatsync -d seatsync
 
 ### Deploy to Production
 ```bash
-# Frontend to Firebase
-firebase deploy --only hosting
+# Deploy backend to Cloud Run
 
 # Backend to Cloud Run
 gcloud run deploy seatsync-backend --source ./backend

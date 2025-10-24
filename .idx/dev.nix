@@ -175,12 +175,6 @@
           pip install -r backend/requirements.txt
         '';
         
-        # Setup Node.js dependencies
-        setup-node-env = ''
-          cd frontend
-          npm install
-        '';
-        
         # Initialize database
         setup-database = ''
           alembic upgrade head
@@ -203,7 +197,7 @@
       };
     };
 
-    # Preview Configuration - Multi-service setup
+    # Preview Configuration - Streamlit-focused development
     previews = {
       enable = true;
       previews = {
@@ -221,21 +215,7 @@
           };
         };
         
-        # Frontend React Application
-        frontend = {
-          command = [
-            "npm"
-            "start"
-          ];
-          cwd = "frontend";
-          manager = "web";
-          env = {
-            PORT = "3000";
-            BROWSER = "none";
-          };
-        };
-        
-        # Streamlit Dashboard (Optional)
+        # Streamlit Dashboard (Primary Development Interface)
         streamlit = {
           command = [
             "sh"
