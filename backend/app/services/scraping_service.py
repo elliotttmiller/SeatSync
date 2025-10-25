@@ -126,7 +126,9 @@ class ScrapingService:
         search_query: Optional[str] = None,
         event_url: Optional[str] = None,
         adaptive: bool = False,
-        marketplaces: Optional[List[str]] = None
+        marketplaces: Optional[List[str]] = None,
+        concurrent: bool = True,
+        max_concurrent: int = 4
     ) -> Dict[str, Any]:
         """
         Scrape all marketplaces and return aggregated results
@@ -136,6 +138,8 @@ class ScrapingService:
             event_url: Direct URL to event page (applied to all marketplaces)
             adaptive: Use adaptive element tracking
             marketplaces: Optional list of marketplaces to scrape (defaults to all)
+            concurrent: Whether to scrape concurrently (default: True for better performance)
+            max_concurrent: Maximum concurrent scrapes (default: 4)
             
         Returns:
             Dictionary with aggregated results including:
@@ -167,52 +171,107 @@ class ScrapingService:
         # Use provided marketplaces or default to all
         marketplaces_to_scrape = marketplaces if marketplaces else list(MARKETPLACES)
         
-        # Scrape each marketplace
+        # Initialize result tracking
         per_marketplace_results = {}
         all_listings = []
         successful_count = 0
         failed_count = 0
         errors = []
         
-        for marketplace in marketplaces_to_scrape:
-            try:
-                logger.info(f"Scraping {marketplace}...")
-                result = await self.scrape_marketplace(
-                    marketplace=marketplace,
-                    search_query=search_query,
-                    event_url=event_url,
-                    adaptive=adaptive
-                )
-                
-                per_marketplace_results[marketplace] = result
-                
-                # Track success/failure
-                if result.get('status') == 'success':
-                    successful_count += 1
-                    # Add listings to combined array
-                    marketplace_listings = result.get('listings', [])
-                    all_listings.extend(marketplace_listings)
-                    logger.info(f"✅ {marketplace}: {len(marketplace_listings)} listings")
-                else:
+        if concurrent:
+            # Concurrent scraping with semaphore to limit parallel requests
+            semaphore = asyncio.Semaphore(max_concurrent)
+            
+            async def scrape_with_semaphore(marketplace: str):
+                """Scrape a single marketplace with semaphore control"""
+                async with semaphore:
+                    try:
+                        logger.info(f"Scraping {marketplace}...")
+                        result = await self.scrape_marketplace(
+                            marketplace=marketplace,
+                            search_query=search_query,
+                            event_url=event_url,
+                            adaptive=adaptive
+                        )
+                        return marketplace, result
+                    except Exception as e:
+                        logger.error(f"Exception scraping {marketplace}: {e}", exc_info=True)
+                        return marketplace, {
+                            'status': 'error',
+                            'platform': marketplace.lower(),
+                            'listings': [],
+                            'error': str(e),
+                            'timestamp': datetime.now().isoformat()
+                        }
+            
+            # Launch all scraping tasks concurrently
+            tasks = [scrape_with_semaphore(mp) for mp in marketplaces_to_scrape]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Process results
+            for item in results:
+                if isinstance(item, Exception):
+                    # Handle unexpected exceptions
                     failed_count += 1
-                    error_msg = result.get('error', 'Unknown error')
-                    errors.append(f"{marketplace}: {error_msg}")
-                    logger.warning(f"❌ {marketplace}: {error_msg}")
+                    error_msg = str(item)
+                    errors.append(f"Unknown marketplace: {error_msg}")
+                    logger.error(f"Unexpected exception: {item}", exc_info=True)
+                else:
+                    marketplace, result = item
+                    per_marketplace_results[marketplace] = result
                     
-            except Exception as e:
-                failed_count += 1
-                error_msg = str(e)
-                errors.append(f"{marketplace}: {error_msg}")
-                logger.error(f"Exception scraping {marketplace}: {e}", exc_info=True)
-                
-                # Store error result
-                per_marketplace_results[marketplace] = {
-                    'status': 'error',
-                    'platform': marketplace.lower(),
-                    'listings': [],
-                    'error': error_msg,
-                    'timestamp': datetime.now().isoformat()
-                }
+                    # Track success/failure
+                    if result.get('status') == 'success':
+                        successful_count += 1
+                        marketplace_listings = result.get('listings', [])
+                        all_listings.extend(marketplace_listings)
+                        logger.info(f"✅ {marketplace}: {len(marketplace_listings)} listings")
+                    else:
+                        failed_count += 1
+                        error_msg = result.get('error', 'Unknown error')
+                        errors.append(f"{marketplace}: {error_msg}")
+                        logger.warning(f"❌ {marketplace}: {error_msg}")
+        else:
+            # Sequential scraping (original implementation)
+            for marketplace in marketplaces_to_scrape:
+                try:
+                    logger.info(f"Scraping {marketplace}...")
+                    result = await self.scrape_marketplace(
+                        marketplace=marketplace,
+                        search_query=search_query,
+                        event_url=event_url,
+                        adaptive=adaptive
+                    )
+                    
+                    per_marketplace_results[marketplace] = result
+                    
+                    # Track success/failure
+                    if result.get('status') == 'success':
+                        successful_count += 1
+                        # Add listings to combined array
+                        marketplace_listings = result.get('listings', [])
+                        all_listings.extend(marketplace_listings)
+                        logger.info(f"✅ {marketplace}: {len(marketplace_listings)} listings")
+                    else:
+                        failed_count += 1
+                        error_msg = result.get('error', 'Unknown error')
+                        errors.append(f"{marketplace}: {error_msg}")
+                        logger.warning(f"❌ {marketplace}: {error_msg}")
+                        
+                except Exception as e:
+                    failed_count += 1
+                    error_msg = str(e)
+                    errors.append(f"{marketplace}: {error_msg}")
+                    logger.error(f"Exception scraping {marketplace}: {e}", exc_info=True)
+                    
+                    # Store error result
+                    per_marketplace_results[marketplace] = {
+                        'status': 'error',
+                        'platform': marketplace.lower(),
+                        'listings': [],
+                        'error': error_msg,
+                        'timestamp': datetime.now().isoformat()
+                    }
         
         # Determine overall status
         total_marketplaces = len(marketplaces_to_scrape)
@@ -233,12 +292,13 @@ class ScrapingService:
                 'successful': successful_count,
                 'failed': failed_count,
                 'total': total_marketplaces,
-                'errors': errors if errors else None
+                'errors': errors if errors else None,
+                'concurrent': concurrent
             },
             'timestamp': datetime.now().isoformat()
         }
         
-        logger.info(f"Multi-marketplace scrape complete: {successful_count}/{total_marketplaces} successful, {len(all_listings)} total listings")
+        logger.info(f"Multi-marketplace scrape complete ({'concurrent' if concurrent else 'sequential'}): {successful_count}/{total_marketplaces} successful, {len(all_listings)} total listings")
         
         return result
     

@@ -205,6 +205,54 @@ async def test_scrape_tickets_with_single_marketplace():
     assert 'per_marketplace' not in result
 
 
+@pytest.mark.asyncio
+async def test_scrape_all_marketplaces_concurrent():
+    """Test concurrent scraping of all marketplaces"""
+    service = await get_scraping_service()
+    
+    result = await service.scrape_all_marketplaces(
+        search_query="test",
+        concurrent=True
+    )
+    
+    assert isinstance(result, dict)
+    assert 'status' in result
+    assert 'per_marketplace' in result
+    assert 'summary' in result
+    
+    # Check that concurrent flag is set in summary (if initialized)
+    summary = result['summary']
+    if service.initialized and result['status'] != 'error':
+        assert 'concurrent' in summary
+        assert summary['concurrent'] is True
+    
+    await service.cleanup()
+
+
+@pytest.mark.asyncio
+async def test_scrape_all_marketplaces_sequential():
+    """Test sequential scraping of all marketplaces"""
+    service = await get_scraping_service()
+    
+    result = await service.scrape_all_marketplaces(
+        search_query="test",
+        concurrent=False
+    )
+    
+    assert isinstance(result, dict)
+    assert 'status' in result
+    assert 'per_marketplace' in result
+    assert 'summary' in result
+    
+    # Check that concurrent flag is set to False in summary (if initialized)
+    summary = result['summary']
+    if service.initialized and result['status'] != 'error':
+        assert 'concurrent' in summary
+        assert summary['concurrent'] is False
+    
+    await service.cleanup()
+
+
 def test_import_structure():
     """Test that imports work correctly"""
     from backend.app.services import scrape_tickets, get_scraping_service, ScrapingService

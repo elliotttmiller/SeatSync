@@ -391,12 +391,10 @@ def show_scraping():
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            rate_limit = st.number_input(
-                "Rate Limit (requests/min)",
-                min_value=10,
-                max_value=60,
-                value=30,
-                help="Number of requests per minute"
+            concurrent_mode = st.checkbox(
+                "⚡ Concurrent Scraping",
+                value=True,
+                help="Scrape marketplaces concurrently for faster results"
             )
         
         with col2:
@@ -419,8 +417,9 @@ def show_scraping():
             st.error("❌ Please select at least one marketplace to scrape")
             return
             
-        with st.spinner(f"Scraping {len(selected_marketplaces)} marketplace(s) for '{search_query}' with Scrapling..."):
-            result = run_full_scrape(search_query, adaptive_mode, selected_marketplaces)
+        scrape_mode = "concurrent" if concurrent_mode else "sequential"
+        with st.spinner(f"Scraping {len(selected_marketplaces)} marketplace(s) {scrape_mode}ly for '{search_query}' with Scrapling..."):
+            result = run_full_scrape(search_query, adaptive_mode, selected_marketplaces, concurrent_mode)
             
             if result:
                 st.session_state.scraping_results.append(result)
@@ -558,7 +557,7 @@ def show_scraping():
         st.dataframe(df_history, use_container_width=True)
 
 
-def run_full_scrape(search_query: str, adaptive: bool = False, marketplaces: Optional[List[str]] = None) -> Dict[str, Any]:
+def run_full_scrape(search_query: str, adaptive: bool = False, marketplaces: Optional[List[str]] = None, concurrent: bool = True) -> Dict[str, Any]:
     """Run full scrape across all selected marketplaces using Scrapling-powered backend services"""
     try:
         if not BACKEND_AVAILABLE:
@@ -600,11 +599,12 @@ def run_full_scrape(search_query: str, adaptive: bool = False, marketplaces: Opt
             from app.services.scraping_service import get_scraping_service
             service = await get_scraping_service()
             
-            # Call scrape_all_marketplaces
+            # Call scrape_all_marketplaces with concurrent flag
             result = await service.scrape_all_marketplaces(
                 search_query=search_query,
                 adaptive=adaptive,
-                marketplaces=marketplaces
+                marketplaces=marketplaces,
+                concurrent=concurrent
             )
             
             return result
