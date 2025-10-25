@@ -1,15 +1,15 @@
 """
-Scrapling-Powered Web Scraping Service - Production Ready
+Scrapling-Powered Web Scraping Service - Production Ready (v0.3.7)
 Modern, fully-featured scraping with all advanced capabilities enabled by default.
 
 This service provides enterprise-grade web scraping with:
-- Full stealth mode (TLS fingerprinting, OS randomization, WebGL/WebRTC)
+- Full stealth mode (TLS fingerprinting, browser impersonation, stealthy headers)
 - Adaptive element tracking (survives website structure changes automatically)
 - Anti-bot detection bypass (Cloudflare, DataDome, AWS WAF)
 - 685x faster parsing than traditional methods
 - Concurrent multi-marketplace scraping
-- Human behavior simulation
-- Network idle detection
+- Human behavior simulation with intelligent delays
+- Advanced retry mechanisms with exponential backoff
 """
 
 import logging
@@ -17,48 +17,73 @@ import time
 import asyncio
 import re
 import urllib.parse
+import random
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 import functools
 
-from scrapling.fetchers import StealthyFetcher
+from scrapling import Fetcher
 
 logger = logging.getLogger(__name__)
 
-# Thread pool for running synchronous StealthyFetcher calls
+# Thread pool for running synchronous Fetcher calls
 # This avoids Windows asyncio subprocess issues
 _executor = ThreadPoolExecutor(max_workers=4)
 
 # Supported marketplaces
 MARKETPLACES = ("stubhub", "seatgeek", "ticketmaster", "vividseats")
 
-# Configuration - all advanced features enabled
-STEALTH_CONFIG = {
-    "headless": True,
-    "network_idle": True,
-    "humanize": True,
-    "disable_resources": False,  # Load all resources for realistic behavior
-    "os_randomize": True,  # Randomize OS fingerprints
-    "allow_webgl": True,  # Enable WebGL for realistic fingerprint
-    "block_webrtc": False,  # Allow WebRTC for realistic fingerprint
-    "google_search": True,  # Simulate Google referer
-    "timeout": 150000,  # 150 seconds
-    "load_dom": True,  # Wait for full DOM load
+# Browser impersonation options for rotation (latest versions)
+BROWSER_IMPERSONATIONS = [
+    'chrome136',
+    'chrome133a', 
+    'chrome131',
+    'chrome124',
+    'chrome123',
+    'edge101',
+    'safari184',
+    'safari180',
+    'firefox135',
+    'firefox133',
+]
+
+# Fetcher configuration for stealth mode
+FETCHER_CONFIG = {
+    "timeout": 150,  # 150 seconds timeout
+    "follow_redirects": True,
+    "max_redirects": 10,
+    "retries": 3,
+    "retry_delay": 2,
+    "stealthy_headers": True,  # Enable stealthy headers (adds realistic browser headers + Google referer)
+    "verify": True,  # Verify SSL certificates
 }
 
 # AWS WAF specific configuration
 AWS_WAF_CONFIG = {
-    "wait_time": 30,  # seconds to wait for AWS WAF challenge
-    "retry_attempts": 3,
-    "retry_delay": 5,
+    "initial_wait": 8,  # Initial wait time before first retry
+    "max_wait": 30,  # Maximum wait time for AWS WAF challenge
+    "retry_attempts": 5,  # Increased retry attempts
+    "backoff_factor": 1.5,  # Exponential backoff multiplier
 }
+
+def get_random_browser():
+    """Get a random browser impersonation for anti-detection"""
+    return random.choice(BROWSER_IMPERSONATIONS)
+
+
+def calculate_backoff_delay(attempt: int, base_delay: float = 1.0, max_delay: float = 30.0) -> float:
+    """Calculate exponential backoff delay with jitter"""
+    delay = min(base_delay * (AWS_WAF_CONFIG["backoff_factor"] ** attempt), max_delay)
+    # Add jitter (±20%)
+    jitter = delay * 0.2 * (random.random() * 2 - 1)
+    return delay + jitter
 
 
 async def run_sync_fetch(fetch_func, *args, **kwargs):
     """
-    Run a synchronous StealthyFetcher operation in a thread pool.
-    This prevents Windows asyncio subprocess issues when using Playwright.
+    Run a synchronous Fetcher operation in a thread pool.
+    This prevents Windows asyncio subprocess issues.
     
     Args:
         fetch_func: The synchronous function to run
@@ -72,16 +97,41 @@ async def run_sync_fetch(fetch_func, *args, **kwargs):
     return await loop.run_in_executor(_executor, func)
 
 
+async def human_delay(min_seconds: float = 1.0, max_seconds: float = 3.0):
+    """Add a random human-like delay"""
+    delay = random.uniform(min_seconds, max_seconds)
+    await asyncio.sleep(delay)
+
+
 class ScraplingScraperService:
     """
-    Production-ready scraping service powered by Scrapling.
+    Production-ready scraping service powered by Scrapling v0.3.7+.
     All advanced features enabled by default - no optional parameters.
     """
     
     def __init__(self):
         self.initialized = True
         self.scraper_type = "scrapling"
-        logger.info("✅ Scrapling scraper initialized with full stealth mode")
+        self.session_counter = 0
+        logger.info("✅ Scrapling scraper initialized with full stealth mode (v0.3.7)")
+    
+    def _create_fetcher(self, adaptive: bool = True) -> Fetcher:
+        """
+        Create a new Fetcher instance with optimal configuration.
+        
+        Args:
+            adaptive: Enable adaptive parsing (survives DOM changes)
+            
+        Returns:
+            Configured Fetcher instance
+        """
+        fetcher = Fetcher()
+        
+        # Configure parser for adaptive tracking if requested
+        if adaptive:
+            fetcher.adaptive = True  # Enable adaptive element tracking
+        
+        return fetcher
     
     async def scrape_marketplace(
         self,
@@ -266,54 +316,65 @@ class ScraplingScraperService:
                         try:
                             logger.info(f"Trying URL: {search_url} (Attempt {attempt + 1}/{AWS_WAF_CONFIG['retry_attempts']})")
                             
+                            # Add human-like delay between attempts
+                            if attempt > 0:
+                                delay = calculate_backoff_delay(attempt, AWS_WAF_CONFIG["initial_wait"])
+                                logger.info(f"Waiting {delay:.1f}s before retry...")
+                                await asyncio.sleep(delay)
+                            
                             def fetch_search():
-                                def wait_for_reload(page):
-                                    time.sleep(AWS_WAF_CONFIG["wait_time"])
-                                    logger.info(f"Waited {AWS_WAF_CONFIG['wait_time']}s for AWS WAF challenge")
+                                fetcher = self._create_fetcher(adaptive=True)
+                                # Rotate browser impersonation
+                                browser = get_random_browser()
+                                logger.debug(f"Using browser: {browser}")
                                 
-                                return StealthyFetcher.fetch(
+                                response = fetcher.get(
                                     search_url,
-                                    **STEALTH_CONFIG,
-                                    solve_cloudflare=False,
-                                    wait=10000,
-                                    page_action=wait_for_reload,
+                                    impersonate=browser,
+                                    **FETCHER_CONFIG
                                 )
+                                
+                                # Give AWS WAF time to validate
+                                time.sleep(AWS_WAF_CONFIG["initial_wait"])
+                                return response
                             
                             page = await run_sync_fetch(fetch_search)
                             
-                            # Check for AWS WAF challenge
-                            page_html = page.html if hasattr(page, 'html') else str(page)
-                            if 'aws-waf-token' not in page_html.lower() and 'challenge-container' not in page_html.lower():
-                                # Check for content
-                                test_selectors = [
-                                    'a[href*="/event/"]',
-                                    'a[data-testid*="event"]',
-                                    '[class*="event"]',
-                                    'main',
-                                ]
-                                
-                                for selector in test_selectors:
-                                    try:
-                                        elements = page.css(selector)
-                                        if elements and len(elements) > 0:
-                                            search_page = page
-                                            successful_url = search_url
-                                            logger.info(f"✅ Successfully loaded page: {search_url}")
-                                            break
-                                    except Exception:
-                                        continue
-                                
-                                if search_page:
-                                    break
+                            # Check for AWS WAF challenge or success
+                            page_text = page.text if hasattr(page, 'text') else str(page)
                             
-                            if attempt < AWS_WAF_CONFIG["retry_attempts"] - 1:
-                                await asyncio.sleep(AWS_WAF_CONFIG["retry_delay"])
-                                
+                            # Check if we're blocked
+                            if 'aws-waf-token' in page_text.lower() or 'challenge-container' in page_text.lower():
+                                logger.warning(f"AWS WAF challenge detected, attempt {attempt + 1}")
+                                continue
+                            
+                            # Check for actual content using multiple selectors
+                            test_selectors = [
+                                'a[href*="/event/"]',
+                                'a[data-testid*="event"]',
+                                '[class*="event"]',
+                                'main',
+                                'body',
+                            ]
+                            
+                            for selector in test_selectors:
+                                try:
+                                    elements = page.css(selector)
+                                    if elements and len(elements) > 0:
+                                        search_page = page
+                                        successful_url = search_url
+                                        logger.info(f"✅ Successfully loaded page with {len(elements)} elements")
+                                        break
+                                except Exception:
+                                    continue
+                            
+                            if search_page:
+                                break
+                            
                         except Exception as e:
-                            if attempt < AWS_WAF_CONFIG["retry_attempts"] - 1:
-                                await asyncio.sleep(AWS_WAF_CONFIG["retry_delay"])
-                            else:
-                                logger.debug(f"All attempts failed for {search_url}: {e}")
+                            logger.debug(f"Attempt {attempt + 1} failed: {e}")
+                            if attempt >= AWS_WAF_CONFIG["retry_attempts"] - 1:
+                                logger.error(f"All attempts failed for {search_url}")
                     
                     if search_page:
                         break
@@ -355,33 +416,69 @@ class ScraplingScraperService:
                 else:
                     event_url = successful_url
             
+            # Add human-like delay before fetching event page
+            await human_delay(2, 4)
+            
             # Scrape ticket listings
             logger.info(f"Scraping tickets from: {event_url}")
             
             def fetch_event():
-                def wait_for_tickets(page):
-                    time.sleep(AWS_WAF_CONFIG["wait_time"])
+                fetcher = self._create_fetcher(adaptive=True)
+                browser = get_random_browser()
                 
-                return StealthyFetcher.fetch(
+                response = fetcher.get(
                     event_url,
-                    **STEALTH_CONFIG,
-                    solve_cloudflare=False,
-                    wait=10000,
-                    page_action=wait_for_tickets,
+                    impersonate=browser,
+                    **FETCHER_CONFIG
                 )
+                
+                # Wait for AWS WAF validation
+                time.sleep(AWS_WAF_CONFIG["initial_wait"])
+                return response
             
             event_page = await run_sync_fetch(fetch_event)
             
             # Extract listings with adaptive tracking
-            listing_elements = event_page.css(
-                '[data-testid*="ticket"], [data-testid*="listing"], .ticket-card, .listing-row',
-                adaptive=True
-            )
+            listing_selectors = [
+                '[data-testid*="ticket"]',
+                '[data-testid*="listing"]',
+                '.ticket-card',
+                '.listing-row',
+                '[class*="TicketCard"]',
+                '[class*="ListingRow"]',
+            ]
+            
+            listing_elements = []
+            for selector in listing_selectors:
+                try:
+                    elements = event_page.css(selector)
+                    if elements and len(elements) > 0:
+                        listing_elements = elements
+                        logger.info(f"Found {len(elements)} listings using selector: {selector}")
+                        break
+                except Exception:
+                    continue
             
             listings = []
             for element in listing_elements:
                 try:
-                    price_element = element.css_first('[data-testid*="price"], [class*="price"], .price')
+                    # Try multiple price selectors
+                    price_selectors = [
+                        '[data-testid*="price"]',
+                        '[class*="price"]',
+                        '.price',
+                        '[class*="Price"]',
+                    ]
+                    
+                    price_element = None
+                    for selector in price_selectors:
+                        try:
+                            price_element = element.css_first(selector)
+                            if price_element:
+                                break
+                        except Exception:
+                            continue
+                    
                     price_text = price_element.text if price_element else None
                     
                     if price_text:
@@ -389,13 +486,13 @@ class ScraplingScraperService:
                         if price_match:
                             price = float(price_match.group())
                             
-                            section_element = element.css_first('[data-testid*="section"], .section')
+                            section_element = element.css_first('[data-testid*="section"], .section, [class*="Section"]')
                             section = section_element.text.strip() if section_element else ''
                             
-                            row_element = element.css_first('[data-testid*="row"], .row')
+                            row_element = element.css_first('[data-testid*="row"], .row, [class*="Row"]')
                             row = row_element.text.strip() if row_element else ''
                             
-                            qty_element = element.css_first('[data-testid*="quantity"], .quantity')
+                            qty_element = element.css_first('[data-testid*="quantity"], .quantity, [class*="Quantity"]')
                             quantity = 1
                             if qty_element:
                                 qty_text = qty_element.text
@@ -461,9 +558,14 @@ class ScraplingScraperService:
                 for search_url in search_urls:
                     try:
                         def fetch_search():
-                            return StealthyFetcher.fetch(search_url, **STEALTH_CONFIG, wait=15000)
+                            fetcher = self._create_fetcher(adaptive=True)
+                            browser = get_random_browser()
+                            return fetcher.get(search_url, impersonate=browser, **FETCHER_CONFIG)
                         
                         page = await run_sync_fetch(fetch_search)
+                        
+                        # Add human-like delay
+                        await human_delay(1, 2)
                         
                         test_links = page.css('a[href*="/event/"], a[href*="-tickets-"]')
                         if test_links:
@@ -495,24 +597,57 @@ class ScraplingScraperService:
                         'timestamp': datetime.now().isoformat()
                     }
             
+            # Add human-like delay before fetching event page
+            await human_delay(2, 4)
+            
             # Scrape ticket listings
             logger.info(f"Scraping tickets from: {event_url}")
             
             def fetch_event():
-                return StealthyFetcher.fetch(event_url, **STEALTH_CONFIG, wait=15000)
+                fetcher = self._create_fetcher(adaptive=True)
+                browser = get_random_browser()
+                return fetcher.get(event_url, impersonate=browser, **FETCHER_CONFIG)
             
             event_page = await run_sync_fetch(fetch_event)
             
             # Extract listings with adaptive tracking
-            listing_elements = event_page.css(
-                '[data-testid*="listing"], .listing, .ticket-listing',
-                adaptive=True
-            )
+            listing_selectors = [
+                '[data-testid*="listing"]',
+                '.listing',
+                '.ticket-listing',
+                '[class*="Listing"]',
+                '[class*="TicketCard"]',
+            ]
+            
+            listing_elements = []
+            for selector in listing_selectors:
+                try:
+                    elements = event_page.css(selector)
+                    if elements and len(elements) > 0:
+                        listing_elements = elements
+                        logger.info(f"Found {len(elements)} listings using selector: {selector}")
+                        break
+                except Exception:
+                    continue
             
             listings = []
             for element in listing_elements:
                 try:
-                    price_element = element.css_first('[data-testid*="price"], [class*="price"], .price')
+                    price_selectors = [
+                        '[data-testid*="price"]',
+                        '[class*="price"]',
+                        '.price',
+                        '[class*="Price"]',
+                    ]
+                    
+                    price_element = None
+                    for selector in price_selectors:
+                        try:
+                            price_element = element.css_first(selector)
+                            if price_element:
+                                break
+                        except Exception:
+                            continue
                     
                     if price_element and price_element.text:
                         price_text = price_element.text
@@ -520,10 +655,10 @@ class ScraplingScraperService:
                         if price_match:
                             price = float(price_match.group())
                             
-                            section_element = element.css_first('[data-testid*="section"], .section')
+                            section_element = element.css_first('[data-testid*="section"], .section, [class*="Section"]')
                             section = section_element.text.strip() if section_element else ''
                             
-                            row_element = element.css_first('[data-testid*="row"], .row')
+                            row_element = element.css_first('[data-testid*="row"], .row, [class*="Row"]')
                             row = row_element.text.strip() if row_element else ''
                             
                             listings.append({
@@ -567,30 +702,67 @@ class ScraplingScraperService:
             logger.info(f"Scraping Ticketmaster: {url}")
             
             def fetch_sync():
-                return StealthyFetcher.fetch(url, **STEALTH_CONFIG)
+                fetcher = self._create_fetcher(adaptive=True)
+                browser = get_random_browser()
+                return fetcher.get(url, impersonate=browser, **FETCHER_CONFIG)
             
             page = await run_sync_fetch(fetch_sync)
             
-            listing_elements = page.css(
-                '[data-testid="event-card"], .event-card, .offer',
-                adaptive=True
-            )
+            # Add human-like delay
+            await human_delay(1, 2)
+            
+            listing_selectors = [
+                '[data-testid="event-card"]',
+                '.event-card',
+                '.offer',
+                '[class*="EventCard"]',
+                '[class*="Offer"]',
+            ]
+            
+            listing_elements = []
+            for selector in listing_selectors:
+                try:
+                    elements = page.css(selector)
+                    if elements and len(elements) > 0:
+                        listing_elements = elements
+                        logger.info(f"Found {len(elements)} listings using selector: {selector}")
+                        break
+                except Exception:
+                    continue
             
             listings = []
             for element in listing_elements:
                 try:
-                    price_element = element.css_first('[data-testid="price"], .price')
+                    price_selectors = [
+                        '[data-testid="price"]',
+                        '.price',
+                        '[class*="Price"]',
+                    ]
+                    
+                    price_element = None
+                    for selector in price_selectors:
+                        try:
+                            price_element = element.css_first(selector)
+                            if price_element:
+                                break
+                        except Exception:
+                            continue
+                    
                     if price_element and price_element.text:
-                        price = float(price_element.text.replace('$', '').replace(',', '').strip())
-                        
-                        section_element = element.css_first('[data-testid="section"], .section')
-                        section = section_element.text if section_element else ''
-                        
-                        listings.append({
-                            'price': price,
-                            'section': section,
-                            'platform': 'ticketmaster'
-                        })
+                        price_text = price_element.text.replace('$', '').replace(',', '').strip()
+                        try:
+                            price = float(price_text)
+                            
+                            section_element = element.css_first('[data-testid="section"], .section, [class*="Section"]')
+                            section = section_element.text if section_element else ''
+                            
+                            listings.append({
+                                'price': price,
+                                'section': section,
+                                'platform': 'ticketmaster'
+                            })
+                        except ValueError:
+                            logger.debug(f"Could not parse price: {price_text}")
                 except Exception as e:
                     logger.debug(f"Error parsing listing: {e}")
             
@@ -626,30 +798,67 @@ class ScraplingScraperService:
             logger.info(f"Scraping Vivid Seats: {url}")
             
             def fetch_sync():
-                return StealthyFetcher.fetch(url, **STEALTH_CONFIG)
+                fetcher = self._create_fetcher(adaptive=True)
+                browser = get_random_browser()
+                return fetcher.get(url, impersonate=browser, **FETCHER_CONFIG)
             
             page = await run_sync_fetch(fetch_sync)
             
-            listing_elements = page.css(
-                '[data-testid="listing"], .listing, .productionListItem',
-                adaptive=True
-            )
+            # Add human-like delay
+            await human_delay(1, 2)
+            
+            listing_selectors = [
+                '[data-testid="listing"]',
+                '.listing',
+                '.productionListItem',
+                '[class*="Listing"]',
+                '[class*="ProductionListItem"]',
+            ]
+            
+            listing_elements = []
+            for selector in listing_selectors:
+                try:
+                    elements = page.css(selector)
+                    if elements and len(elements) > 0:
+                        listing_elements = elements
+                        logger.info(f"Found {len(elements)} listings using selector: {selector}")
+                        break
+                except Exception:
+                    continue
             
             listings = []
             for element in listing_elements:
                 try:
-                    price_element = element.css_first('[data-testid="price"], .price')
+                    price_selectors = [
+                        '[data-testid="price"]',
+                        '.price',
+                        '[class*="Price"]',
+                    ]
+                    
+                    price_element = None
+                    for selector in price_selectors:
+                        try:
+                            price_element = element.css_first(selector)
+                            if price_element:
+                                break
+                        except Exception:
+                            continue
+                    
                     if price_element and price_element.text:
-                        price = float(price_element.text.replace('$', '').replace(',', '').strip())
-                        
-                        section_element = element.css_first('[data-testid="section"], .section')
-                        section = section_element.text if section_element else ''
-                        
-                        listings.append({
-                            'price': price,
-                            'section': section,
-                            'platform': 'vividseats'
-                        })
+                        price_text = price_element.text.replace('$', '').replace(',', '').strip()
+                        try:
+                            price = float(price_text)
+                            
+                            section_element = element.css_first('[data-testid="section"], .section, [class*="Section"]')
+                            section = section_element.text if section_element else ''
+                            
+                            listings.append({
+                                'price': price,
+                                'section': section,
+                                'platform': 'vividseats'
+                            })
+                        except ValueError:
+                            logger.debug(f"Could not parse price: {price_text}")
                 except Exception as e:
                     logger.debug(f"Error parsing listing: {e}")
             
