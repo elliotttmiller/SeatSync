@@ -205,13 +205,14 @@ class ScraplingScrapingService:
                         
                         def fetch_search():
                             # Use Scrapling's full stealth capabilities to bypass AWS WAF
+                            # Increased wait time to 10 seconds to allow AWS WAF challenges to be solved
                             return StealthyFetcher.fetch(
                                 search_url,
                                 headless=True,
                                 solve_cloudflare=True,  # Handles Cloudflare, AWS WAF, and other challenges
                                 google_search=False,
                                 network_idle=True,
-                                wait=3000,  # Wait 3 seconds for dynamic content (milliseconds)
+                                wait=10000,  # Wait 10 seconds for dynamic content and challenge solving (milliseconds)
                                 humanize=True,  # Humanize cursor movement
                                 disable_resources=False,  # Load all resources for proper rendering
                                 os_randomize=False  # Match OS fingerprints with current system
@@ -220,23 +221,48 @@ class ScraplingScrapingService:
                         with concurrent.futures.ThreadPoolExecutor() as executor:
                             page = await loop.run_in_executor(executor, fetch_search)
                         
-                        # Check if we got an AWS WAF challenge page
+                        # Check if we got an AWS WAF challenge page that wasn't solved
                         page_html = page.html if hasattr(page, 'html') else str(page)
                         if 'aws-waf-token' in page_html.lower() or 'challenge-container' in page_html.lower():
-                            logger.warning(f"AWS WAF challenge detected on {search_url}, Scrapling should handle this automatically")
-                            # Scrapling's solve_cloudflare should handle AWS WAF challenges too
-                            # If we still get blocked, the page may need more time or different approach
+                            logger.warning(f"AWS WAF challenge still present on {search_url} after solving attempt")
+                            # Skip this URL and try the next one
+                            continue
                         
                         # Check if page loaded successfully (not a 404 or challenge page)
-                        # We can check this by looking for event links or performer content
-                        test_links = page.css('a[href*="/event/"], a[data-testid*="event"], [class*="event"]')
-                        if test_links:
+                        # Try multiple selectors to find content on the page
+                        # StubHub may have changed their page structure
+                        test_selectors = [
+                            'a[href*="/event/"]',
+                            'a[data-testid*="event"]',
+                            '[class*="event"]',
+                            '[class*="Event"]',
+                            'a[href*="-tickets-"]',
+                            '[data-testid*="performer"]',
+                            '[class*="EventCard"]',
+                            'main',  # Any main content
+                            '#content',  # Content div
+                        ]
+                        
+                        page_has_content = False
+                        for selector in test_selectors:
+                            try:
+                                elements = page.css(selector)
+                                if elements and len(elements) > 0:
+                                    page_has_content = True
+                                    logger.info(f"Found {len(elements)} elements with selector '{selector}'")
+                                    break
+                            except Exception as e:
+                                logger.debug(f"Selector '{selector}' failed: {e}")
+                        
+                        if page_has_content:
                             search_page = page
                             successful_url = search_url
-                            logger.info(f"Successfully loaded page with events: {search_url}")
+                            logger.info(f"Successfully loaded page: {search_url}")
                             break
                         else:
-                            logger.info(f"Page loaded but no events found: {search_url}")
+                            logger.info(f"Page loaded but no content found: {search_url}")
+                            # Log a sample of the HTML for debugging
+                            logger.debug(f"Page HTML sample: {page_html[:500]}")
                     except Exception as e:
                         logger.debug(f"Failed to load {search_url}: {e}")
                         continue
@@ -255,54 +281,63 @@ class ScraplingScrapingService:
                     }
                 
                 # Find event links on the page
-                event_links = search_page.css('a[href*="/event/"], a[data-testid*="event"], .eventCard a, .event-card a')
+                # Try multiple selectors to find event links
+                event_link_selectors = [
+                    'a[href*="/event/"]',
+                    'a[data-testid*="event"]',
+                    '.eventCard a',
+                    '.event-card a',
+                    '[class*="EventCard"] a',
+                    'a[href*="-tickets-"]',
+                    'a[href*="/performer/"]'
+                ]
+                
+                event_links = []
+                for selector in event_link_selectors:
+                    try:
+                        links = search_page.css(selector)
+                        if links:
+                            event_links.extend(links)
+                            logger.info(f"Found {len(links)} event links with selector '{selector}'")
+                    except Exception as e:
+                        logger.debug(f"Selector '{selector}' failed: {e}")
                 
                 if not event_links:
                     logger.warning(f"No event links found for: {search_query}")
-                    return {
-                        'status': 'success',
-                        'platform': 'stubhub',
-                        'url': successful_url,
-                        'listings': [],
-                        'count': 0,
-                        'timestamp': datetime.now().isoformat(),
-                        'scraper': 'scrapling',
-                        'message': f'No events found for "{search_query}"'
-                    }
-                
-                # Get the first event URL
-                first_event = event_links[0]
-                event_href = first_event.attrib.get('href', '')
-                
-                # Handle relative URLs
-                if event_href.startswith('/'):
-                    event_url = f'https://www.stubhub.com{event_href}'
-                elif event_href.startswith('http'):
-                    event_url = event_href
+                    # If we can't find event links, this might actually be an event page already
+                    # Let's try to scrape it as an event page
+                    logger.info("Attempting to scrape the page as an event page directly")
+                    event_url = successful_url
                 else:
-                    logger.warning(f"Invalid event URL format: {event_href}")
-                    return {
-                        'status': 'error',
-                        'platform': 'stubhub',
-                        'error': f'Could not find valid event URL for "{search_query}"',
-                        'listings': [],
-                        'timestamp': datetime.now().isoformat()
-                    }
-                
-                logger.info(f"Found event URL: {event_url}")
+                    # Get the first event URL
+                    first_event = event_links[0]
+                    event_href = first_event.attrib.get('href', '')
+                    
+                    # Handle relative URLs
+                    if event_href.startswith('/'):
+                        event_url = f'https://www.stubhub.com{event_href}'
+                    elif event_href.startswith('http'):
+                        event_url = event_href
+                    else:
+                        logger.warning(f"Invalid event URL format: {event_href}")
+                        # Try to use the page we loaded as the event page
+                        event_url = successful_url
+                    
+                    logger.info(f"Found event URL: {event_url}")
             
             # Step 2: Scrape ticket listings from event page
             logger.info(f"Scraping tickets from event page: {event_url}")
             
             def fetch_event():
                 # Use full stealth capabilities to bypass anti-bot protection
+                # Increased wait time to 10 seconds to allow AWS WAF challenges to be solved
                 return StealthyFetcher.fetch(
                     event_url,
                     headless=True,
                     solve_cloudflare=True,  # Handles Cloudflare, AWS WAF, and other challenges
                     google_search=False,
                     network_idle=True,
-                    wait=5000,  # Wait 5 seconds for ticket listings to load (milliseconds)
+                    wait=10000,  # Wait 10 seconds for ticket listings to load and challenges to solve (milliseconds)
                     humanize=True,  # Humanize cursor movement
                     disable_resources=False,  # Ensure all page resources load
                     os_randomize=False
@@ -444,13 +479,14 @@ class ScraplingScrapingService:
                         
                         def fetch_search():
                             # Use full stealth capabilities for SeatGeek as well
+                            # Increased wait time to 10 seconds to allow challenges to be solved
                             return StealthyFetcher.fetch(
                                 search_url,
                                 headless=True,
                                 solve_cloudflare=True,
                                 google_search=False,
                                 network_idle=True,
-                                wait=3000,
+                                wait=10000,  # Wait 10 seconds for dynamic content and challenge solving (milliseconds)
                                 humanize=True,
                                 disable_resources=False,
                                 os_randomize=False
@@ -527,13 +563,14 @@ class ScraplingScrapingService:
             
             def fetch_event():
                 # Use full stealth capabilities for event page
+                # Increased wait time to 10 seconds to allow challenges to be solved
                 return StealthyFetcher.fetch(
                     event_url,
                     headless=True,
                     solve_cloudflare=True,
                     google_search=False,
                     network_idle=True,
-                    wait=5000,
+                    wait=10000,  # Wait 10 seconds for ticket listings to load and challenges to solve (milliseconds)
                     humanize=True,
                     disable_resources=False,
                     os_randomize=False
