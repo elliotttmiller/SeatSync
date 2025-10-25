@@ -17,7 +17,6 @@ import time
 import asyncio
 import re
 import urllib.parse
-import concurrent.futures
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 
@@ -216,8 +215,6 @@ class ScraplingScraperService:
     ) -> Dict[str, Any]:
         """Scrape StubHub with full stealth mode and AWS WAF bypass"""
         try:
-            loop = asyncio.get_event_loop()
-            
             # Find event URL if not provided
             if not event_url:
                 if not search_query:
@@ -259,8 +256,7 @@ class ScraplingScraperService:
                                     page_action=wait_for_reload,
                                 )
                             
-                            with concurrent.futures.ThreadPoolExecutor() as executor:
-                                page = await loop.run_in_executor(executor, fetch_search)
+                            page = await asyncio.to_thread(fetch_search)
                             
                             # Check for AWS WAF challenge
                             page_html = page.html if hasattr(page, 'html') else str(page)
@@ -351,8 +347,7 @@ class ScraplingScraperService:
                     page_action=wait_for_tickets,
                 )
             
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                event_page = await loop.run_in_executor(executor, fetch_event)
+            event_page = await asyncio.to_thread(fetch_event)
             
             # Extract listings with adaptive tracking
             listing_elements = event_page.css(
@@ -421,8 +416,6 @@ class ScraplingScraperService:
     ) -> Dict[str, Any]:
         """Scrape SeatGeek with full stealth mode"""
         try:
-            loop = asyncio.get_event_loop()
-            
             # Find event URL if not provided
             if not event_url:
                 if not search_query:
@@ -447,8 +440,7 @@ class ScraplingScraperService:
                         def fetch_search():
                             return StealthyFetcher.fetch(search_url, **STEALTH_CONFIG, wait=15000)
                         
-                        with concurrent.futures.ThreadPoolExecutor() as executor:
-                            page = await loop.run_in_executor(executor, fetch_search)
+                        page = await asyncio.to_thread(fetch_search)
                         
                         test_links = page.css('a[href*="/event/"], a[href*="-tickets-"]')
                         if test_links:
@@ -486,8 +478,7 @@ class ScraplingScraperService:
             def fetch_event():
                 return StealthyFetcher.fetch(event_url, **STEALTH_CONFIG, wait=15000)
             
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                event_page = await loop.run_in_executor(executor, fetch_event)
+            event_page = await asyncio.to_thread(fetch_event)
             
             # Extract listings with adaptive tracking
             listing_elements = event_page.css(
@@ -552,13 +543,10 @@ class ScraplingScraperService:
             url = event_url or f'https://www.ticketmaster.com/search?q={search_query or "sports"}'
             logger.info(f"Scraping Ticketmaster: {url}")
             
-            loop = asyncio.get_event_loop()
-            
             def fetch_sync():
                 return StealthyFetcher.fetch(url, **STEALTH_CONFIG)
             
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                page = await loop.run_in_executor(executor, fetch_sync)
+            page = await asyncio.to_thread(fetch_sync)
             
             listing_elements = page.css(
                 '[data-testid="event-card"], .event-card, .offer',
@@ -614,13 +602,10 @@ class ScraplingScraperService:
             url = event_url or f'https://www.vividseats.com/search?search={search_query or "sports"}'
             logger.info(f"Scraping Vivid Seats: {url}")
             
-            loop = asyncio.get_event_loop()
-            
             def fetch_sync():
                 return StealthyFetcher.fetch(url, **STEALTH_CONFIG)
             
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                page = await loop.run_in_executor(executor, fetch_sync)
+            page = await asyncio.to_thread(fetch_sync)
             
             listing_elements = page.css(
                 '[data-testid="listing"], .listing, .productionListItem',
