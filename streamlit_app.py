@@ -438,8 +438,24 @@ def show_scraping():
                                 title='Listing Price Distribution'
                             )
                             st.plotly_chart(fig, width="stretch")
+                    else:
+                        st.info("ℹ️ No listings found. The page loaded successfully but contained no ticket data.")
                 else:
+                    # Scraping failed - show detailed error
                     st.error(f"❌ Scraping failed: {result.get('error', 'Unknown error')}")
+                    
+                    # Show additional context if available
+                    if result.get('message'):
+                        st.warning(f"ℹ️ {result.get('message')}")
+                    
+                    # Show recommendations if available
+                    if result.get('recommendations'):
+                        st.markdown("**Recommended Solutions:**")
+                        for rec in result['recommendations']:
+                            st.markdown(f"- {rec}")
+                        
+                        # Show link to documentation
+                        st.info("📖 See AWS_WAF_LIMITATION.md for detailed information about this limitation.")
     
     # Display scraping history
     if st.session_state.scraping_results:

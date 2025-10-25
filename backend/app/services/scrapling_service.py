@@ -31,6 +31,7 @@ If you still encounter blocks, consider:
 """
 
 import logging
+import time
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 import asyncio
@@ -38,6 +39,11 @@ import re
 import urllib.parse
 
 logger = logging.getLogger(__name__)
+
+# Configuration constants
+AWS_WAF_WAIT_TIME = 30  # seconds to wait for AWS WAF challenge to complete
+AWS_WAF_RETRY_ATTEMPTS = 3  # number of retry attempts for AWS WAF challenges
+AWS_WAF_RETRY_DELAY = 5  # seconds to wait between retry attempts
 
 # Try to import Scrapling
 try:
@@ -162,6 +168,12 @@ class ScraplingScrapingService:
         """
         Scrape StubHub using Scrapling's advanced stealth features
         
+        NOTE: StubHub uses AWS WAF which may block automated browsers.
+        If scraping fails, consider:
+        - Using StubHub's official API (recommended for production)
+        - Using residential proxies
+        - Running from different geographic locations
+        
         Two-step process:
         1. If no event_url provided, search for events and find the first matching event URL
         2. Navigate to event page and scrape actual ticket listings
@@ -200,116 +212,259 @@ class ScraplingScrapingService:
                 successful_url = None
                 
                 for search_url in search_urls:
-                    try:
-                        logger.info(f"Trying URL: {search_url}")
-                        
-                        def fetch_search():
-                            # Use Scrapling's full stealth capabilities to bypass AWS WAF
-                            return StealthyFetcher.fetch(
-                                search_url,
-                                headless=True,
-                                solve_cloudflare=True,  # Handles Cloudflare, AWS WAF, and other challenges
-                                google_search=False,
-                                network_idle=True,
-                                wait=3000,  # Wait 3 seconds for dynamic content (milliseconds)
-                                humanize=True,  # Humanize cursor movement
-                                disable_resources=False,  # Load all resources for proper rendering
-                                os_randomize=False  # Match OS fingerprints with current system
-                            )
-                        
-                        with concurrent.futures.ThreadPoolExecutor() as executor:
-                            page = await loop.run_in_executor(executor, fetch_search)
-                        
-                        # Check if we got an AWS WAF challenge page
-                        page_html = page.html if hasattr(page, 'html') else str(page)
-                        if 'aws-waf-token' in page_html.lower() or 'challenge-container' in page_html.lower():
-                            logger.warning(f"AWS WAF challenge detected on {search_url}, Scrapling should handle this automatically")
-                            # Scrapling's solve_cloudflare should handle AWS WAF challenges too
-                            # If we still get blocked, the page may need more time or different approach
-                        
-                        # Check if page loaded successfully (not a 404 or challenge page)
-                        # We can check this by looking for event links or performer content
-                        test_links = page.css('a[href*="/event/"], a[data-testid*="event"], [class*="event"]')
-                        if test_links:
-                            search_page = page
-                            successful_url = search_url
-                            logger.info(f"Successfully loaded page with events: {search_url}")
-                            break
-                        else:
-                            logger.info(f"Page loaded but no events found: {search_url}")
-                    except Exception as e:
-                        logger.debug(f"Failed to load {search_url}: {e}")
-                        continue
+                    # Try multiple attempts with different strategies to bypass AWS WAF
+                    for attempt in range(AWS_WAF_RETRY_ATTEMPTS):
+                        try:
+                            logger.info(f"Trying URL: {search_url} (Attempt {attempt + 1}/{AWS_WAF_RETRY_ATTEMPTS})")
+                            
+                            def fetch_search():
+                                # Advanced AWS WAF bypass strategy based on ScraperAPI recommendations:
+                                # 1. Proper browser fingerprinting with OS randomization
+                                # 2. Human-like behavior simulation
+                                # 3. Extended wait times for JavaScript execution
+                                # 4. Network idle detection to ensure full page load
+                                # 5. Multiple retry attempts with delays
+                                
+                                def wait_for_reload(page):
+                                    """Wait for AWS WAF challenge to complete and page to reload"""
+                                    # Wait for AWS WAF challenge to process
+                                    # Using extended wait time to allow JavaScript to fully execute
+                                    time.sleep(AWS_WAF_WAIT_TIME)
+                                    logger.info(f"Waited {AWS_WAF_WAIT_TIME} seconds for AWS WAF challenge to complete")
+                                
+                                # Use advanced stealth features for AWS WAF bypass
+                                return StealthyFetcher.fetch(
+                                    search_url,
+                                    headless=True,  # Use headless mode (required for server environments)
+                                    solve_cloudflare=False,  # AWS WAF is different from Cloudflare
+                                    google_search=True,  # Set referer as if coming from Google (more natural)
+                                    network_idle=True,  # Wait for network to be idle
+                                    wait=10000,  # Wait 10 seconds initially for page load
+                                    humanize=True,  # Humanize cursor movement and interactions
+                                    disable_resources=False,  # Load all resources for realistic behavior
+                                    os_randomize=True,  # Randomize OS fingerprints to avoid detection
+                                    timeout=150000,  # Increase timeout to 150 seconds
+                                    load_dom=True,  # Wait for all JavaScript to fully load
+                                    page_action=wait_for_reload,  # Additional wait for AWS WAF
+                                    allow_webgl=True,  # Enable WebGL (many WAFs check for this)
+                                    block_webrtc=False,  # Allow WebRTC for realistic fingerprint
+                                )
+                            
+                            with concurrent.futures.ThreadPoolExecutor() as executor:
+                                page = await loop.run_in_executor(executor, fetch_search)
+                            
+                            # Check if we got an AWS WAF challenge page that wasn't solved
+                            page_html = page.html if hasattr(page, 'html') else str(page)
+                            if 'aws-waf-token' in page_html.lower() or 'challenge-container' in page_html.lower():
+                                if attempt < AWS_WAF_RETRY_ATTEMPTS - 1:
+                                    logger.warning(f"AWS WAF challenge still present on {search_url} (Attempt {attempt + 1})")
+                                    logger.info(f"Retrying in {AWS_WAF_RETRY_DELAY} seconds with enhanced stealth...")
+                                    await asyncio.sleep(AWS_WAF_RETRY_DELAY)
+                                    continue  # Retry with next attempt
+                                else:
+                                    logger.warning(f"AWS WAF challenge persists after {AWS_WAF_RETRY_ATTEMPTS} attempts")
+                                    logger.info("AWS WAF bypass strategies applied:")
+                                    logger.info("  ✓ OS fingerprint randomization")
+                                    logger.info("  ✓ Google search referer")
+                                    logger.info("  ✓ Extended wait times (30s+)")
+                                    logger.info("  ✓ Human behavior simulation")
+                                    logger.info("  ✓ WebGL and WebRTC enabled")
+                                    logger.info("Consider: Residential proxies, API access, or different timing")
+                                    break  # Move to next URL
+                            
+                            # Check if page loaded successfully (not a 404 or challenge page)
+                            # Try multiple selectors to find content on the page
+                            # StubHub may have changed their page structure
+                            test_selectors = [
+                            'a[href*="/event/"]',
+                            'a[data-testid*="event"]',
+                            '[class*="event"]',
+                            '[class*="Event"]',
+                            'a[href*="-tickets-"]',
+                            '[data-testid*="performer"]',
+                            '[class*="EventCard"]',
+                            'main',  # Any main content
+                            '#content',  # Content div
+                            ]
+                            
+                            page_has_content = False
+                            for selector in test_selectors:
+                                try:
+                                    elements = page.css(selector)
+                                    if elements and len(elements) > 0:
+                                        page_has_content = True
+                                        logger.info(f"Found {len(elements)} elements with selector '{selector}'")
+                                        break
+                                except Exception as e:
+                                    logger.debug(f"Selector '{selector}' failed: {e}")
+                            
+                            if page_has_content:
+                                search_page = page
+                                successful_url = search_url
+                                logger.info(f"✅ Successfully bypassed AWS WAF and loaded page: {search_url}")
+                                break  # Break out of retry loop
+                            else:
+                                if attempt < AWS_WAF_RETRY_ATTEMPTS - 1:
+                                    logger.info(f"No content found, retrying in {AWS_WAF_RETRY_DELAY} seconds...")
+                                    await asyncio.sleep(AWS_WAF_RETRY_DELAY)
+                                else:
+                                    logger.info(f"Page loaded but no content found after {AWS_WAF_RETRY_ATTEMPTS} attempts: {search_url}")
+                                    # Log a sample of the HTML for debugging
+                                    logger.debug(f"Page HTML sample: {page_html[:500]}")
+                        except Exception as e:
+                            if attempt < AWS_WAF_RETRY_ATTEMPTS - 1:
+                                logger.debug(f"Attempt {attempt + 1} failed for {search_url}: {e}, retrying...")
+                                await asyncio.sleep(AWS_WAF_RETRY_DELAY)
+                            else:
+                                logger.debug(f"All {AWS_WAF_RETRY_ATTEMPTS} attempts failed for {search_url}: {e}")
+                    
+                    # Break out of URL loop if we successfully loaded a page
+                    if search_page:
+                        break
                 
                 if not search_page:
-                    logger.warning(f"Could not load any StubHub page for: {search_query}")
+                    logger.warning(f"Could not bypass AWS WAF protection for: {search_query} after {AWS_WAF_RETRY_ATTEMPTS} attempts")
                     return {
-                        'status': 'success',
+                        'status': 'error',
                         'platform': 'stubhub',
                         'url': search_urls[0],
                         'listings': [],
                         'count': 0,
                         'timestamp': datetime.now().isoformat(),
                         'scraper': 'scrapling',
-                        'message': f'Could not find events page for "{search_query}". URLs tried: {len(search_urls)}'
+                        'error': f'AWS WAF protection blocked access to StubHub for "{search_query}" after {AWS_WAF_RETRY_ATTEMPTS} retry attempts',
+                        'message': 'StubHub uses advanced AWS WAF protection. Applied multiple bypass techniques including OS randomization, extended wait times, and human behavior simulation.',
+                        'techniques_applied': [
+                            'OS fingerprint randomization',
+                            'Google search referer simulation',
+                            f'{AWS_WAF_RETRY_ATTEMPTS} retry attempts with delays',
+                            f'{AWS_WAF_WAIT_TIME}s wait time per attempt',
+                            'Human behavior simulation',
+                            'WebGL and WebRTC enabled',
+                            'Network idle detection',
+                            'Full DOM loading'
+                        ],
+                        'recommendations': [
+                            'Use StubHub Official API (recommended)',
+                            'Try with residential IP proxy service',
+                            'Use official partnership programs',
+                            'Contact StubHub for API access',
+                            'Try at different times (less WAF activity)',
+                            'Consider alternative marketplaces'
+                        ]
                     }
                 
                 # Find event links on the page
-                event_links = search_page.css('a[href*="/event/"], a[data-testid*="event"], .eventCard a, .event-card a')
+                # Try multiple selectors to find event links
+                event_link_selectors = [
+                    'a[href*="/event/"]',
+                    'a[data-testid*="event"]',
+                    '.eventCard a',
+                    '.event-card a',
+                    '[class*="EventCard"] a',
+                    'a[href*="-tickets-"]',
+                    'a[href*="/performer/"]'
+                ]
+                
+                event_links = []
+                for selector in event_link_selectors:
+                    try:
+                        links = search_page.css(selector)
+                        if links:
+                            event_links.extend(links)
+                            logger.info(f"Found {len(links)} event links with selector '{selector}'")
+                    except Exception as e:
+                        logger.debug(f"Selector '{selector}' failed: {e}")
                 
                 if not event_links:
                     logger.warning(f"No event links found for: {search_query}")
-                    return {
-                        'status': 'success',
-                        'platform': 'stubhub',
-                        'url': successful_url,
-                        'listings': [],
-                        'count': 0,
-                        'timestamp': datetime.now().isoformat(),
-                        'scraper': 'scrapling',
-                        'message': f'No events found for "{search_query}"'
-                    }
-                
-                # Get the first event URL
-                first_event = event_links[0]
-                event_href = first_event.attrib.get('href', '')
-                
-                # Handle relative URLs
-                if event_href.startswith('/'):
-                    event_url = f'https://www.stubhub.com{event_href}'
-                elif event_href.startswith('http'):
-                    event_url = event_href
+                    # If we can't find event links, this might actually be an event page already
+                    # Let's try to scrape it as an event page
+                    logger.info("Attempting to scrape the page as an event page directly")
+                    event_url = successful_url
                 else:
-                    logger.warning(f"Invalid event URL format: {event_href}")
-                    return {
-                        'status': 'error',
-                        'platform': 'stubhub',
-                        'error': f'Could not find valid event URL for "{search_query}"',
-                        'listings': [],
-                        'timestamp': datetime.now().isoformat()
-                    }
-                
-                logger.info(f"Found event URL: {event_url}")
+                    # Get the first event URL
+                    first_event = event_links[0]
+                    event_href = first_event.attrib.get('href', '')
+                    
+                    # Handle relative URLs
+                    if event_href.startswith('/'):
+                        event_url = f'https://www.stubhub.com{event_href}'
+                    elif event_href.startswith('http'):
+                        event_url = event_href
+                    else:
+                        logger.warning(f"Invalid event URL format: {event_href}")
+                        # Try to use the page we loaded as the event page
+                        event_url = successful_url
+                    
+                    logger.info(f"Found event URL: {event_url}")
             
             # Step 2: Scrape ticket listings from event page
             logger.info(f"Scraping tickets from event page: {event_url}")
             
-            def fetch_event():
-                # Use full stealth capabilities to bypass anti-bot protection
-                return StealthyFetcher.fetch(
-                    event_url,
-                    headless=True,
-                    solve_cloudflare=True,  # Handles Cloudflare, AWS WAF, and other challenges
-                    google_search=False,
-                    network_idle=True,
-                    wait=5000,  # Wait 5 seconds for ticket listings to load (milliseconds)
-                    humanize=True,  # Humanize cursor movement
-                    disable_resources=False,  # Ensure all page resources load
-                    os_randomize=False
-                )
+            # Apply same retry strategy for event page
+            event_page = None
+            for attempt in range(AWS_WAF_RETRY_ATTEMPTS):
+                try:
+                    logger.info(f"Fetching event page (Attempt {attempt + 1}/{AWS_WAF_RETRY_ATTEMPTS})")
+                    
+                    def fetch_event():
+                        # Use same advanced AWS WAF bypass techniques for event page
+                        def wait_for_tickets(page):
+                            """Wait for ticket listings to load after AWS WAF challenge"""
+                            time.sleep(AWS_WAF_WAIT_TIME)
+                            logger.info(f"Waited {AWS_WAF_WAIT_TIME} seconds for ticket listings to load")
+                        
+                        return StealthyFetcher.fetch(
+                            event_url,
+                            headless=True,
+                            solve_cloudflare=False,
+                            google_search=True,  # Simulate Google referer
+                            network_idle=True,
+                            wait=10000,
+                            humanize=True,
+                            disable_resources=False,
+                            os_randomize=True,  # Randomize OS fingerprints
+                            timeout=150000,
+                            load_dom=True,
+                            page_action=wait_for_tickets,
+                            allow_webgl=True,
+                            block_webrtc=False,
+                        )
+                    
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        event_page = await loop.run_in_executor(executor, fetch_event)
+                    
+                    # Check if AWS WAF challenge is present
+                    event_html = event_page.html if hasattr(event_page, 'html') else str(event_page)
+                    if 'aws-waf-token' in event_html.lower() or 'challenge-container' in event_html.lower():
+                        if attempt < AWS_WAF_RETRY_ATTEMPTS - 1:
+                            logger.warning(f"AWS WAF challenge on event page (Attempt {attempt + 1}), retrying...")
+                            await asyncio.sleep(AWS_WAF_RETRY_DELAY)
+                            continue
+                        else:
+                            logger.error(f"AWS WAF challenge persists on event page after {AWS_WAF_RETRY_ATTEMPTS} attempts")
+                            break
+                    
+                    # Successfully loaded event page
+                    logger.info("✅ Event page loaded successfully")
+                    break
+                    
+                except Exception as e:
+                    if attempt < AWS_WAF_RETRY_ATTEMPTS - 1:
+                        logger.warning(f"Event page fetch attempt {attempt + 1} failed: {e}, retrying...")
+                        await asyncio.sleep(AWS_WAF_RETRY_DELAY)
+                    else:
+                        logger.error(f"Failed to fetch event page after {AWS_WAF_RETRY_ATTEMPTS} attempts: {e}")
             
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                event_page = await loop.run_in_executor(executor, fetch_event)
+            if not event_page:
+                return {
+                    'status': 'error',
+                    'platform': 'stubhub',
+                    'error': 'Failed to load event page after multiple retry attempts',
+                    'listings': [],
+                    'timestamp': datetime.now().isoformat()
+                }
             
             # Extract ticket listings from event page
             # StubHub ticket listings have specific selectors
@@ -443,17 +598,19 @@ class ScraplingScrapingService:
                         logger.info(f"Trying URL: {search_url}")
                         
                         def fetch_search():
-                            # Use full stealth capabilities for SeatGeek as well
+                            # Use stealth capabilities without solve_cloudflare
+                            # Rely on stealth mode and longer wait time
                             return StealthyFetcher.fetch(
                                 search_url,
                                 headless=True,
-                                solve_cloudflare=True,
+                                solve_cloudflare=False,
                                 google_search=False,
                                 network_idle=True,
-                                wait=3000,
+                                wait=15000,  # Wait 15 seconds for dynamic content (milliseconds)
                                 humanize=True,
                                 disable_resources=False,
-                                os_randomize=False
+                                os_randomize=False,
+                                timeout=60000
                             )
                         
                         with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -526,17 +683,18 @@ class ScraplingScrapingService:
             logger.info(f"Scraping tickets from event page: {event_url}")
             
             def fetch_event():
-                # Use full stealth capabilities for event page
+                # Use stealth capabilities without solve_cloudflare
                 return StealthyFetcher.fetch(
                     event_url,
                     headless=True,
-                    solve_cloudflare=True,
+                    solve_cloudflare=False,
                     google_search=False,
                     network_idle=True,
-                    wait=5000,
+                    wait=15000,  # Wait 15 seconds (milliseconds)
                     humanize=True,
                     disable_resources=False,
-                    os_randomize=False
+                    os_randomize=False,
+                    timeout=60000
                 )
             
             with concurrent.futures.ThreadPoolExecutor() as executor:
