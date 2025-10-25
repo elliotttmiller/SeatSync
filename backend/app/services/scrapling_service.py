@@ -211,21 +211,29 @@ class ScraplingScrapingService:
                         
                         def fetch_search():
                             # Use Scrapling's stealth capabilities
-                            # Don't use solve_cloudflare for AWS WAF - it only handles Cloudflare
                             # AWS WAF requires JavaScript execution and page reload
-                            # We need to wait for the real content to load after the challenge
+                            # We'll use page_action to wait for navigation after the challenge
+                            
+                            def wait_for_reload(page):
+                                """Wait for AWS WAF challenge to complete and page to reload"""
+                                import time
+                                # Wait for AWS WAF challenge to process
+                                time.sleep(25)  # Give plenty of time for JavaScript to execute
+                                logger.info("Waited 25 seconds for AWS WAF challenge to complete")
+                            
                             return StealthyFetcher.fetch(
                                 search_url,
-                                headless=True,
-                                solve_cloudflare=False,  # Don't try to solve Cloudflare challenges - AWS WAF is different
+                                headless=True,  # Use headless mode (required for server environments)
+                                solve_cloudflare=False,
                                 google_search=False,
                                 network_idle=True,
-                                wait=20000,  # Wait 20 seconds for AWS WAF challenge to complete and page to reload (milliseconds)
-                                humanize=True,  # Humanize cursor movement
-                                disable_resources=False,  # Load all resources for proper rendering
-                                os_randomize=False,  # Match OS fingerprints with current system
-                                timeout=90000,  # Increase timeout to 90 seconds
-                                load_dom=True,  # Wait for all JavaScript to fully load and execute
+                                wait=5000,
+                                humanize=True,
+                                disable_resources=False,
+                                os_randomize=False,
+                                timeout=120000,
+                                load_dom=True,
+                                page_action=wait_for_reload
                             )
                         
                         with concurrent.futures.ThreadPoolExecutor() as executor:
