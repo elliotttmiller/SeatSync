@@ -162,6 +162,12 @@ class ScraplingScrapingService:
         """
         Scrape StubHub using Scrapling's advanced stealth features
         
+        NOTE: StubHub uses AWS WAF which may block automated browsers.
+        If scraping fails, consider:
+        - Using StubHub's official API (recommended for production)
+        - Using residential proxies
+        - Running from different geographic locations
+        
         Two-step process:
         1. If no event_url provided, search for events and find the first matching event URL
         2. Navigate to event page and scrape actual ticket listings
@@ -204,18 +210,22 @@ class ScraplingScrapingService:
                         logger.info(f"Trying URL: {search_url}")
                         
                         def fetch_search():
-                            # Use Scrapling's full stealth capabilities to bypass AWS WAF
-                            # Increased wait time to 10 seconds to allow AWS WAF challenges to be solved
+                            # Use Scrapling's stealth capabilities
+                            # Don't use solve_cloudflare for AWS WAF - it only handles Cloudflare
+                            # AWS WAF requires JavaScript execution and page reload
+                            # We need to wait for the real content to load after the challenge
                             return StealthyFetcher.fetch(
                                 search_url,
                                 headless=True,
-                                solve_cloudflare=True,  # Handles Cloudflare, AWS WAF, and other challenges
+                                solve_cloudflare=False,  # Don't try to solve Cloudflare challenges - AWS WAF is different
                                 google_search=False,
                                 network_idle=True,
-                                wait=10000,  # Wait 10 seconds for dynamic content and challenge solving (milliseconds)
+                                wait=20000,  # Wait 20 seconds for AWS WAF challenge to complete and page to reload (milliseconds)
                                 humanize=True,  # Humanize cursor movement
                                 disable_resources=False,  # Load all resources for proper rendering
-                                os_randomize=False  # Match OS fingerprints with current system
+                                os_randomize=False,  # Match OS fingerprints with current system
+                                timeout=90000,  # Increase timeout to 90 seconds
+                                load_dom=True,  # Wait for all JavaScript to fully load and execute
                             )
                         
                         with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -224,7 +234,12 @@ class ScraplingScrapingService:
                         # Check if we got an AWS WAF challenge page that wasn't solved
                         page_html = page.html if hasattr(page, 'html') else str(page)
                         if 'aws-waf-token' in page_html.lower() or 'challenge-container' in page_html.lower():
-                            logger.warning(f"AWS WAF challenge still present on {search_url} after solving attempt")
+                            logger.warning(f"AWS WAF challenge still present on {search_url} after waiting")
+                            logger.info("AWS WAF challenges may require:")
+                            logger.info("  - Official API access (recommended)")
+                            logger.info("  - Residential IP addresses")
+                            logger.info("  - Non-headless browser mode")
+                            logger.info("  - Additional wait time or manual intervention")
                             # Skip this URL and try the next one
                             continue
                         
@@ -268,16 +283,23 @@ class ScraplingScrapingService:
                         continue
                 
                 if not search_page:
-                    logger.warning(f"Could not load any StubHub page for: {search_query}")
+                    logger.warning(f"Could not bypass AWS WAF protection for: {search_query}")
                     return {
-                        'status': 'success',
+                        'status': 'error',
                         'platform': 'stubhub',
                         'url': search_urls[0],
                         'listings': [],
                         'count': 0,
                         'timestamp': datetime.now().isoformat(),
                         'scraper': 'scrapling',
-                        'message': f'Could not find events page for "{search_query}". URLs tried: {len(search_urls)}'
+                        'error': f'AWS WAF protection blocked access to StubHub for "{search_query}"',
+                        'message': 'StubHub uses AWS WAF which blocks automated browsers. Consider using their official API for production use.',
+                        'recommendations': [
+                            'Use StubHub Official API (recommended)',
+                            'Try with residential IP addresses',
+                            'Use official partnership programs',
+                            'Contact StubHub for API access'
+                        ]
                     }
                 
                 # Find event links on the page
@@ -329,18 +351,19 @@ class ScraplingScrapingService:
             logger.info(f"Scraping tickets from event page: {event_url}")
             
             def fetch_event():
-                # Use full stealth capabilities to bypass anti-bot protection
-                # Increased wait time to 10 seconds to allow AWS WAF challenges to be solved
+                # Use stealth capabilities without solve_cloudflare for AWS WAF
+                # AWS WAF challenges need more time to load, not automated solving
                 return StealthyFetcher.fetch(
                     event_url,
                     headless=True,
-                    solve_cloudflare=True,  # Handles Cloudflare, AWS WAF, and other challenges
+                    solve_cloudflare=False,  # Don't try to solve Cloudflare challenges - AWS WAF is different
                     google_search=False,
                     network_idle=True,
-                    wait=10000,  # Wait 10 seconds for ticket listings to load and challenges to solve (milliseconds)
+                    wait=15000,  # Wait 15 seconds for ticket listings to load (milliseconds)
                     humanize=True,  # Humanize cursor movement
                     disable_resources=False,  # Ensure all page resources load
-                    os_randomize=False
+                    os_randomize=False,
+                    timeout=60000  # Increase timeout to 60 seconds
                 )
             
             with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -478,18 +501,19 @@ class ScraplingScrapingService:
                         logger.info(f"Trying URL: {search_url}")
                         
                         def fetch_search():
-                            # Use full stealth capabilities for SeatGeek as well
-                            # Increased wait time to 10 seconds to allow challenges to be solved
+                            # Use stealth capabilities without solve_cloudflare
+                            # Rely on stealth mode and longer wait time
                             return StealthyFetcher.fetch(
                                 search_url,
                                 headless=True,
-                                solve_cloudflare=True,
+                                solve_cloudflare=False,
                                 google_search=False,
                                 network_idle=True,
-                                wait=10000,  # Wait 10 seconds for dynamic content and challenge solving (milliseconds)
+                                wait=15000,  # Wait 15 seconds for dynamic content (milliseconds)
                                 humanize=True,
                                 disable_resources=False,
-                                os_randomize=False
+                                os_randomize=False,
+                                timeout=60000
                             )
                         
                         with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -562,18 +586,18 @@ class ScraplingScrapingService:
             logger.info(f"Scraping tickets from event page: {event_url}")
             
             def fetch_event():
-                # Use full stealth capabilities for event page
-                # Increased wait time to 10 seconds to allow challenges to be solved
+                # Use stealth capabilities without solve_cloudflare
                 return StealthyFetcher.fetch(
                     event_url,
                     headless=True,
-                    solve_cloudflare=True,
+                    solve_cloudflare=False,
                     google_search=False,
                     network_idle=True,
-                    wait=10000,  # Wait 10 seconds for ticket listings to load and challenges to solve (milliseconds)
+                    wait=15000,  # Wait 15 seconds (milliseconds)
                     humanize=True,
                     disable_resources=False,
-                    os_randomize=False
+                    os_randomize=False,
+                    timeout=60000
                 )
             
             with concurrent.futures.ThreadPoolExecutor() as executor:
