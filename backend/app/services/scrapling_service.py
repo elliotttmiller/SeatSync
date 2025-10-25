@@ -31,6 +31,7 @@ If you still encounter blocks, consider:
 """
 
 import logging
+import time
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 import asyncio
@@ -38,6 +39,9 @@ import re
 import urllib.parse
 
 logger = logging.getLogger(__name__)
+
+# Configuration constants
+AWS_WAF_WAIT_TIME = 25  # seconds to wait for AWS WAF challenge to complete
 
 # Try to import Scrapling
 try:
@@ -216,10 +220,9 @@ class ScraplingScrapingService:
                             
                             def wait_for_reload(page):
                                 """Wait for AWS WAF challenge to complete and page to reload"""
-                                import time
                                 # Wait for AWS WAF challenge to process
-                                time.sleep(25)  # Give plenty of time for JavaScript to execute
-                                logger.info("Waited 25 seconds for AWS WAF challenge to complete")
+                                time.sleep(AWS_WAF_WAIT_TIME)  # Give plenty of time for JavaScript to execute
+                                logger.info(f"Waited {AWS_WAF_WAIT_TIME} seconds for AWS WAF challenge to complete")
                             
                             return StealthyFetcher.fetch(
                                 search_url,
