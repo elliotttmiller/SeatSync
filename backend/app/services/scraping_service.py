@@ -76,7 +76,7 @@ class ScrapingService:
         Scrape a marketplace using Scrapling
         
         Args:
-            marketplace: Name of marketplace (stubhub, seatgeek, etc)
+            marketplace: Name of marketplace (seatgeek, ticketmaster, vividseats)
             search_query: Search term for events
             event_url: Direct URL to event page
             adaptive: Use adaptive element tracking (True if website structure changed)
@@ -182,7 +182,7 @@ async def scrape_tickets(
     Convenience function for quick scraping with Scrapling
     
     Args:
-        marketplace: Marketplace name (stubhub, seatgeek, ticketmaster, vividseats)
+        marketplace: Marketplace name (seatgeek, ticketmaster, vividseats)
         search_query: Search query string
         event_url: Direct event URL
         adaptive: Use adaptive element tracking (True if website structure changed)

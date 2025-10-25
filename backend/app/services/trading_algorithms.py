@@ -408,7 +408,7 @@ class AdvancedTradingEngine:
             }
             
             # Analyze platform liquidity and fees
-            platforms = ['stubhub', 'seatgeek', 'ticketmaster', 'vivid_seats']
+            platforms = ['seatgeek', 'ticketmaster', 'vivid_seats']
             platform_metrics = {}
             
             for platform in platforms:
@@ -479,7 +479,7 @@ class AdvancedTradingEngine:
     ) -> str:
         """Select optimal platform for trade execution"""
         try:
-            best_platform = "stubhub"  # Default
+            best_platform = "seatgeek"  # Default
             best_score = 0.0
             
             for platform, metrics in platform_metrics.items():
@@ -498,7 +498,7 @@ class AdvancedTradingEngine:
             
         except Exception as e:
             logger.error(f"Platform selection error: {e}")
-            return "stubhub"
+            return "seatgeek"
     
     async def _calculate_performance_attribution(
         self, 
