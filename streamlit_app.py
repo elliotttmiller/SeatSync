@@ -1,6 +1,7 @@
 """
 SeatSync - Advanced Ticket Analytics Platform
 Modern dark theme interface inspired by ChatGPT
+Windows-native compatible with optimized asyncio handling
 """
 
 import streamlit as st
@@ -8,11 +9,15 @@ import pandas as pd
 import numpy as np
 import asyncio
 import sys
+import platform
 from pathlib import Path
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
 import plotly.express as px
 from typing import Dict, List, Any
+
+# Windows compatibility
+IS_WINDOWS = platform.system() == 'Windows'
 
 # Add backend to path
 backend_path = Path(__file__).parent / "backend"
@@ -157,10 +162,16 @@ def main():
     page = st.sidebar.radio("Navigation", ["🏠 Dashboard", "🕷️ Scraping", "📊 Analytics"], label_visibility="collapsed")
     
     st.sidebar.markdown("---")
-    st.sidebar.markdown("""
+    
+    # Platform detection display
+    platform_icon = "🪟" if IS_WINDOWS else "🐧" if platform.system() == "Linux" else "🍎"
+    platform_name = platform.system()
+    
+    st.sidebar.markdown(f"""
     <div style='padding: 1rem; background: rgba(16,163,127,0.1); border-radius: 8px; border: 1px solid rgba(16,163,127,0.3);'>
         <div style='color: #10A37F; font-weight: 600; margin-bottom: 0.5rem;'>✨ Full Stealth Mode</div>
         <div style='font-size: 0.85rem; color: #B4B4B4;'>All advanced features active</div>
+        <div style='font-size: 0.85rem; color: #B4B4B4; margin-top: 0.5rem;'>{platform_icon} {platform_name}-optimized</div>
     </div>
     """, unsafe_allow_html=True)
     
@@ -202,12 +213,17 @@ def show_dashboard():
 
 def show_scraping():
     st.markdown('<div class="main-title">🕷️ Multi-Marketplace Scraping</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-title">Real-time data • All marketplaces • Full stealth mode</div>', unsafe_allow_html=True)
     
-    st.markdown("""
+    platform_status = "🪟 Windows-optimized" if IS_WINDOWS else f"{platform.system()}-compatible"
+    st.markdown(f'<div class="sub-title">Real-time data • All marketplaces • Full stealth mode • {platform_status}</div>', unsafe_allow_html=True)
+    
+    info_msg = '✨ <strong>Full Stealth Mode Active</strong> - All advanced features enabled<br>🎯 Concurrent scraping across 4 marketplaces'
+    if IS_WINDOWS:
+        info_msg += '<br>🪟 <strong>Windows-Optimized:</strong> Enhanced event loop handling, extended timeouts, Windows-native browser priority'
+    
+    st.markdown(f"""
     <div class='info-msg'>
-        ✨ <strong>Full Stealth Mode Active</strong> - All advanced features enabled<br>
-        🎯 Concurrent scraping across 4 marketplaces
+        {info_msg}
     </div>
     """, unsafe_allow_html=True)
     

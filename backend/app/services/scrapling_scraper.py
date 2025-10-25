@@ -10,6 +10,7 @@ This service provides enterprise-grade web scraping with:
 - Concurrent multi-marketplace scraping
 - Human behavior simulation with intelligent delays
 - Advanced retry mechanisms with exponential backoff
+- Windows-native compatibility with optimized event loop handling
 """
 
 import logging
@@ -18,6 +19,8 @@ import asyncio
 import re
 import urllib.parse
 import random
+import platform
+import sys
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
@@ -27,48 +30,85 @@ from scrapling import Fetcher
 
 logger = logging.getLogger(__name__)
 
+# Windows compatibility detection
+IS_WINDOWS = platform.system() == 'Windows'
+
+# Configure asyncio for Windows compatibility
+if IS_WINDOWS:
+    # On Windows, use WindowsSelectorEventLoopPolicy for better compatibility
+    # This avoids ProactorEventLoop subprocess issues
+    if sys.version_info >= (3, 8):
+        try:
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+            logger.info("✅ Windows detected - Using WindowsSelectorEventLoopPolicy for optimal compatibility")
+        except AttributeError:
+            # Fallback for older Python versions
+            logger.warning("⚠️ Windows detected but WindowsSelectorEventLoopPolicy not available")
+            pass
+
 # Thread pool for running synchronous Fetcher calls
-# This avoids Windows asyncio subprocess issues
-_executor = ThreadPoolExecutor(max_workers=4)
+# This avoids Windows asyncio subprocess issues with ProactorEventLoop
+# On Windows, we use WindowsSelectorEventLoopPolicy for better subprocess handling
+_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix='scrapling_worker')
 
 # Supported marketplaces
 MARKETPLACES = ("stubhub", "seatgeek", "ticketmaster", "vividseats")
 
 # Browser impersonation options for rotation (latest versions)
+# Windows-compatible browser impersonations prioritized
 BROWSER_IMPERSONATIONS = [
+    'chrome136',      # Windows/Mac/Linux
+    'chrome133a',     # Windows/Mac/Linux
+    'chrome131',      # Windows/Mac/Linux
+    'chrome124',      # Windows/Mac/Linux
+    'chrome123',      # Windows/Mac/Linux
+    'edge101',        # Windows-native browser
+    'safari184',      # Mac-native (cross-platform compatible)
+    'safari180',      # Mac-native (cross-platform compatible)
+    'firefox135',     # Windows/Mac/Linux
+    'firefox133',     # Windows/Mac/Linux
+]
+
+# Windows-specific browser selection (prioritize Windows-native browsers)
+WINDOWS_PREFERRED_BROWSERS = [
     'chrome136',
-    'chrome133a', 
+    'chrome133a',
     'chrome131',
+    'edge101',      # Edge is Windows-native
     'chrome124',
     'chrome123',
-    'edge101',
-    'safari184',
-    'safari180',
-    'firefox135',
-    'firefox133',
 ]
 
 # Fetcher configuration for stealth mode
+# Windows-optimized timeouts and retry settings
 FETCHER_CONFIG = {
-    "timeout": 150,  # 150 seconds timeout
+    "timeout": 150,  # 150 seconds timeout (Windows-compatible)
     "follow_redirects": True,
     "max_redirects": 10,
     "retries": 3,
     "retry_delay": 2,
     "stealthy_headers": True,  # Enable stealthy headers (adds realistic browser headers + Google referer)
-    "verify": True,  # Verify SSL certificates
+    "verify": True,  # Verify SSL certificates (Windows certificate store compatible)
 }
 
 # AWS WAF specific configuration
+# Windows-optimized timing to handle slower disk I/O
 AWS_WAF_CONFIG = {
-    "initial_wait": 8,  # Initial wait time before first retry
-    "max_wait": 30,  # Maximum wait time for AWS WAF challenge
-    "retry_attempts": 5,  # Increased retry attempts
-    "backoff_factor": 1.5,  # Exponential backoff multiplier
+    "initial_wait": 10 if IS_WINDOWS else 8,  # Longer initial wait on Windows
+    "max_wait": 35 if IS_WINDOWS else 30,     # Longer max wait on Windows
+    "retry_attempts": 5,                      # Increased retry attempts
+    "backoff_factor": 1.5,                    # Exponential backoff multiplier
 }
 
 def get_random_browser():
-    """Get a random browser impersonation for anti-detection"""
+    """
+    Get a random browser impersonation for anti-detection.
+    On Windows, prioritizes Windows-native browsers (Chrome, Edge).
+    """
+    if IS_WINDOWS:
+        # 70% chance to use Windows-preferred browsers
+        if random.random() < 0.7:
+            return random.choice(WINDOWS_PREFERRED_BROWSERS)
     return random.choice(BROWSER_IMPERSONATIONS)
 
 
@@ -83,7 +123,12 @@ def calculate_backoff_delay(attempt: int, base_delay: float = 1.0, max_delay: fl
 async def run_sync_fetch(fetch_func, *args, **kwargs):
     """
     Run a synchronous Fetcher operation in a thread pool.
-    This prevents Windows asyncio subprocess issues.
+    This prevents Windows asyncio subprocess issues with ProactorEventLoop.
+    
+    Windows Compatibility:
+    - Uses WindowsSelectorEventLoopPolicy (set at module import)
+    - ThreadPoolExecutor isolates sync operations from async event loop
+    - Prevents NotImplementedError on Windows subprocess operations
     
     Args:
         fetch_func: The synchronous function to run
@@ -107,13 +152,24 @@ class ScraplingScraperService:
     """
     Production-ready scraping service powered by Scrapling v0.3.7+.
     All advanced features enabled by default - no optional parameters.
+    
+    Windows Compatibility:
+    - WindowsSelectorEventLoopPolicy for subprocess handling
+    - ThreadPoolExecutor for thread isolation
+    - Windows-preferred browser rotation (Chrome, Edge)
+    - Extended timeouts for Windows disk I/O
     """
     
     def __init__(self):
         self.initialized = True
         self.scraper_type = "scrapling"
         self.session_counter = 0
-        logger.info("✅ Scrapling scraper initialized with full stealth mode (v0.3.7)")
+        self.is_windows = IS_WINDOWS
+        
+        log_msg = f"✅ Scrapling scraper initialized with full stealth mode (v0.3.7)"
+        if IS_WINDOWS:
+            log_msg += " - Windows-optimized configuration active"
+        logger.info(log_msg)
     
     def _create_fetcher(self, adaptive: bool = True) -> Fetcher:
         """
