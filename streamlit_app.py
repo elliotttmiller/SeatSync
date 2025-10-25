@@ -154,7 +154,7 @@ def main():
     st.sidebar.markdown("**Analytics Platform**")
     st.sidebar.markdown("---")
     
-    page = st.sidebar.radio("", ["🏠 Dashboard", "🕷️ Scraping", "📊 Analytics"])
+    page = st.sidebar.radio("Navigation", ["🏠 Dashboard", "🕷️ Scraping", "📊 Analytics"], label_visibility="collapsed")
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("""
