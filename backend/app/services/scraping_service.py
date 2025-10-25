@@ -211,10 +211,10 @@ class ScrapingService:
             # Process results
             for item in results:
                 if isinstance(item, Exception):
-                    # Handle unexpected exceptions
+                    # Handle unexpected exceptions from asyncio.gather
                     failed_count += 1
                     error_msg = str(item)
-                    errors.append(f"Unknown marketplace: {error_msg}")
+                    errors.append(f"Exception during scraping: {error_msg}")
                     logger.error(f"Unexpected exception: {item}", exc_info=True)
                 else:
                     marketplace, result = item
