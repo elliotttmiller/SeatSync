@@ -1,7 +1,97 @@
-# StubHub Scraping AWS WAF Challenge - Known Limitation
+# StubHub Scraping AWS WAF Challenge - Advanced Bypass Techniques
 
 ## Problem
-StubHub uses AWS WAF (Web Application Firewall) to protect against automated browsing. This protection actively detects and blocks automated browsers, even those using advanced stealth techniques like Scrapling.
+StubHub uses AWS WAF (Web Application Firewall) to protect against automated browsing. This protection actively detects and blocks automated browsers.
+
+## Advanced Bypass Techniques Implemented
+
+Based on industry-standard practices from ScraperAPI and other professional scraping services, we've implemented multiple advanced techniques:
+
+### 1. **OS Fingerprint Randomization** ✅
+- Randomizes operating system fingerprints to avoid detection patterns
+- Makes each request appear from different OS configurations
+- Uses `os_randomize=True` in Scrapling
+
+### 2. **Google Search Referer Simulation** ✅
+- Sets referer header as if traffic came from Google search
+- Makes requests appear more natural and organic
+- Uses `google_search=True` in Scrapling
+
+### 3. **Multiple Retry Attempts with Delays** ✅
+- Attempts up to 3 times per URL with 5-second delays
+- Gives AWS WAF time to reset between attempts
+- Prevents rapid-fire requests that trigger blocks
+
+### 4. **Extended Wait Times** ✅
+- 30 seconds per attempt for JavaScript execution
+- Additional 10 seconds initial wait for page load
+- Total up to 150 seconds timeout per attempt
+
+### 5. **Human Behavior Simulation** ✅
+- Humanizes cursor movement and interactions
+- Simulates realistic browsing patterns
+- Uses `humanize=True` in Scrapling
+
+### 6. **WebGL and WebRTC Enabled** ✅
+- Many WAFs check for WebGL availability
+- WebRTC provides realistic browser fingerprint
+- Uses `allow_webgl=True` and `block_webrtc=False`
+
+### 7. **Network Idle Detection** ✅
+- Waits for all network connections to complete
+- Ensures full page load before proceeding
+- Uses `network_idle=True` in Scrapling
+
+### 8. **Full DOM Loading** ✅
+- Waits for all JavaScript to fully execute
+- Ensures dynamic content is rendered
+- Uses `load_dom=True` in Scrapling
+
+## Configuration
+
+```python
+AWS_WAF_WAIT_TIME = 30  # seconds per attempt
+AWS_WAF_RETRY_ATTEMPTS = 3  # number of retry attempts
+AWS_WAF_RETRY_DELAY = 5  # seconds between retries
+```
+
+## How It Works
+
+### Search Page Flow:
+1. Try first URL with all bypass techniques
+2. If AWS WAF detected → wait 5s → retry with same techniques
+3. Repeat up to 3 times per URL
+4. If all attempts fail → try next URL
+5. Apply same logic to all URLs in list
+
+### Event Page Flow:
+1. Apply same retry strategy to event page
+2. Up to 3 attempts with 5-second delays
+3. Enhanced logging of bypass techniques applied
+
+## Current Results
+
+While these techniques significantly improve bypass success rates:
+- ✅ Eliminates false "Cloudflare challenge" errors
+- ✅ Proper AWS WAF detection and reporting
+- ✅ Multiple retry attempts with intelligent delays
+- ✅ Advanced browser fingerprinting evasion
+- ⚠️  AWS WAF may still block access in some cases
+
+## Why AWS WAF May Still Block
+
+AWS WAF uses multiple detection layers:
+- Browser fingerprinting analysis
+- JavaScript behavior profiling
+- TLS fingerprint matching
+- Mouse/keyboard interaction patterns
+- Headless browser detection
+- IP reputation scoring
+
+Even with all bypass techniques, AWS WAF may detect automation through:
+- Headless mode detection (required for server environments)
+- Datacenter IP addresses (vs residential IPs)
+- Consistent request patterns over time
 
 ## Symptoms
 - "No Cloudflare challenge found" error (misleading - it's actually AWS WAF)

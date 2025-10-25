@@ -41,7 +41,9 @@ import urllib.parse
 logger = logging.getLogger(__name__)
 
 # Configuration constants
-AWS_WAF_WAIT_TIME = 25  # seconds to wait for AWS WAF challenge to complete
+AWS_WAF_WAIT_TIME = 30  # seconds to wait for AWS WAF challenge to complete
+AWS_WAF_RETRY_ATTEMPTS = 3  # number of retry attempts for AWS WAF challenges
+AWS_WAF_RETRY_DELAY = 5  # seconds to wait between retry attempts
 
 # Try to import Scrapling
 try:
@@ -210,54 +212,70 @@ class ScraplingScrapingService:
                 successful_url = None
                 
                 for search_url in search_urls:
-                    try:
-                        logger.info(f"Trying URL: {search_url}")
-                        
-                        def fetch_search():
-                            # Use Scrapling's stealth capabilities
-                            # AWS WAF requires JavaScript execution and page reload
-                            # We'll use page_action to wait for navigation after the challenge
+                    # Try multiple attempts with different strategies to bypass AWS WAF
+                    for attempt in range(AWS_WAF_RETRY_ATTEMPTS):
+                        try:
+                            logger.info(f"Trying URL: {search_url} (Attempt {attempt + 1}/{AWS_WAF_RETRY_ATTEMPTS})")
                             
-                            def wait_for_reload(page):
-                                """Wait for AWS WAF challenge to complete and page to reload"""
-                                # Wait for AWS WAF challenge to process
-                                time.sleep(AWS_WAF_WAIT_TIME)  # Give plenty of time for JavaScript to execute
-                                logger.info(f"Waited {AWS_WAF_WAIT_TIME} seconds for AWS WAF challenge to complete")
+                            def fetch_search():
+                                # Advanced AWS WAF bypass strategy based on ScraperAPI recommendations:
+                                # 1. Proper browser fingerprinting with OS randomization
+                                # 2. Human-like behavior simulation
+                                # 3. Extended wait times for JavaScript execution
+                                # 4. Network idle detection to ensure full page load
+                                # 5. Multiple retry attempts with delays
+                                
+                                def wait_for_reload(page):
+                                    """Wait for AWS WAF challenge to complete and page to reload"""
+                                    # Wait for AWS WAF challenge to process
+                                    # Using extended wait time to allow JavaScript to fully execute
+                                    time.sleep(AWS_WAF_WAIT_TIME)
+                                    logger.info(f"Waited {AWS_WAF_WAIT_TIME} seconds for AWS WAF challenge to complete")
+                                
+                                # Use advanced stealth features for AWS WAF bypass
+                                return StealthyFetcher.fetch(
+                                    search_url,
+                                    headless=True,  # Use headless mode (required for server environments)
+                                    solve_cloudflare=False,  # AWS WAF is different from Cloudflare
+                                    google_search=True,  # Set referer as if coming from Google (more natural)
+                                    network_idle=True,  # Wait for network to be idle
+                                    wait=10000,  # Wait 10 seconds initially for page load
+                                    humanize=True,  # Humanize cursor movement and interactions
+                                    disable_resources=False,  # Load all resources for realistic behavior
+                                    os_randomize=True,  # Randomize OS fingerprints to avoid detection
+                                    timeout=150000,  # Increase timeout to 150 seconds
+                                    load_dom=True,  # Wait for all JavaScript to fully load
+                                    page_action=wait_for_reload,  # Additional wait for AWS WAF
+                                    allow_webgl=True,  # Enable WebGL (many WAFs check for this)
+                                    block_webrtc=False,  # Allow WebRTC for realistic fingerprint
+                                )
                             
-                            return StealthyFetcher.fetch(
-                                search_url,
-                                headless=True,  # Use headless mode (required for server environments)
-                                solve_cloudflare=False,
-                                google_search=False,
-                                network_idle=True,
-                                wait=5000,
-                                humanize=True,
-                                disable_resources=False,
-                                os_randomize=False,
-                                timeout=120000,
-                                load_dom=True,
-                                page_action=wait_for_reload
-                            )
-                        
-                        with concurrent.futures.ThreadPoolExecutor() as executor:
-                            page = await loop.run_in_executor(executor, fetch_search)
-                        
-                        # Check if we got an AWS WAF challenge page that wasn't solved
-                        page_html = page.html if hasattr(page, 'html') else str(page)
-                        if 'aws-waf-token' in page_html.lower() or 'challenge-container' in page_html.lower():
-                            logger.warning(f"AWS WAF challenge still present on {search_url} after waiting")
-                            logger.info("AWS WAF challenges may require:")
-                            logger.info("  - Official API access (recommended)")
-                            logger.info("  - Residential IP addresses")
-                            logger.info("  - Non-headless browser mode")
-                            logger.info("  - Additional wait time or manual intervention")
-                            # Skip this URL and try the next one
-                            continue
-                        
-                        # Check if page loaded successfully (not a 404 or challenge page)
-                        # Try multiple selectors to find content on the page
-                        # StubHub may have changed their page structure
-                        test_selectors = [
+                            with concurrent.futures.ThreadPoolExecutor() as executor:
+                                page = await loop.run_in_executor(executor, fetch_search)
+                            
+                            # Check if we got an AWS WAF challenge page that wasn't solved
+                            page_html = page.html if hasattr(page, 'html') else str(page)
+                            if 'aws-waf-token' in page_html.lower() or 'challenge-container' in page_html.lower():
+                                if attempt < AWS_WAF_RETRY_ATTEMPTS - 1:
+                                    logger.warning(f"AWS WAF challenge still present on {search_url} (Attempt {attempt + 1})")
+                                    logger.info(f"Retrying in {AWS_WAF_RETRY_DELAY} seconds with enhanced stealth...")
+                                    await asyncio.sleep(AWS_WAF_RETRY_DELAY)
+                                    continue  # Retry with next attempt
+                                else:
+                                    logger.warning(f"AWS WAF challenge persists after {AWS_WAF_RETRY_ATTEMPTS} attempts")
+                                    logger.info("AWS WAF bypass strategies applied:")
+                                    logger.info("  ✓ OS fingerprint randomization")
+                                    logger.info("  ✓ Google search referer")
+                                    logger.info("  ✓ Extended wait times (30s+)")
+                                    logger.info("  ✓ Human behavior simulation")
+                                    logger.info("  ✓ WebGL and WebRTC enabled")
+                                    logger.info("Consider: Residential proxies, API access, or different timing")
+                                    break  # Move to next URL
+                            
+                            # Check if page loaded successfully (not a 404 or challenge page)
+                            # Try multiple selectors to find content on the page
+                            # StubHub may have changed their page structure
+                            test_selectors = [
                             'a[href*="/event/"]',
                             'a[data-testid*="event"]',
                             '[class*="event"]',
@@ -267,34 +285,45 @@ class ScraplingScrapingService:
                             '[class*="EventCard"]',
                             'main',  # Any main content
                             '#content',  # Content div
-                        ]
-                        
-                        page_has_content = False
-                        for selector in test_selectors:
-                            try:
-                                elements = page.css(selector)
-                                if elements and len(elements) > 0:
-                                    page_has_content = True
-                                    logger.info(f"Found {len(elements)} elements with selector '{selector}'")
-                                    break
-                            except Exception as e:
-                                logger.debug(f"Selector '{selector}' failed: {e}")
-                        
-                        if page_has_content:
-                            search_page = page
-                            successful_url = search_url
-                            logger.info(f"Successfully loaded page: {search_url}")
-                            break
-                        else:
-                            logger.info(f"Page loaded but no content found: {search_url}")
-                            # Log a sample of the HTML for debugging
-                            logger.debug(f"Page HTML sample: {page_html[:500]}")
-                    except Exception as e:
-                        logger.debug(f"Failed to load {search_url}: {e}")
-                        continue
+                            ]
+                            
+                            page_has_content = False
+                            for selector in test_selectors:
+                                try:
+                                    elements = page.css(selector)
+                                    if elements and len(elements) > 0:
+                                        page_has_content = True
+                                        logger.info(f"Found {len(elements)} elements with selector '{selector}'")
+                                        break
+                                except Exception as e:
+                                    logger.debug(f"Selector '{selector}' failed: {e}")
+                            
+                            if page_has_content:
+                                search_page = page
+                                successful_url = search_url
+                                logger.info(f"✅ Successfully bypassed AWS WAF and loaded page: {search_url}")
+                                break  # Break out of retry loop
+                            else:
+                                if attempt < AWS_WAF_RETRY_ATTEMPTS - 1:
+                                    logger.info(f"No content found, retrying in {AWS_WAF_RETRY_DELAY} seconds...")
+                                    await asyncio.sleep(AWS_WAF_RETRY_DELAY)
+                                else:
+                                    logger.info(f"Page loaded but no content found after {AWS_WAF_RETRY_ATTEMPTS} attempts: {search_url}")
+                                    # Log a sample of the HTML for debugging
+                                    logger.debug(f"Page HTML sample: {page_html[:500]}")
+                        except Exception as e:
+                            if attempt < AWS_WAF_RETRY_ATTEMPTS - 1:
+                                logger.debug(f"Attempt {attempt + 1} failed for {search_url}: {e}, retrying...")
+                                await asyncio.sleep(AWS_WAF_RETRY_DELAY)
+                            else:
+                                logger.debug(f"All {AWS_WAF_RETRY_ATTEMPTS} attempts failed for {search_url}: {e}")
+                    
+                    # Break out of URL loop if we successfully loaded a page
+                    if search_page:
+                        break
                 
                 if not search_page:
-                    logger.warning(f"Could not bypass AWS WAF protection for: {search_query}")
+                    logger.warning(f"Could not bypass AWS WAF protection for: {search_query} after {AWS_WAF_RETRY_ATTEMPTS} attempts")
                     return {
                         'status': 'error',
                         'platform': 'stubhub',
@@ -303,13 +332,25 @@ class ScraplingScrapingService:
                         'count': 0,
                         'timestamp': datetime.now().isoformat(),
                         'scraper': 'scrapling',
-                        'error': f'AWS WAF protection blocked access to StubHub for "{search_query}"',
-                        'message': 'StubHub uses AWS WAF which blocks automated browsers. Consider using their official API for production use.',
+                        'error': f'AWS WAF protection blocked access to StubHub for "{search_query}" after {AWS_WAF_RETRY_ATTEMPTS} retry attempts',
+                        'message': 'StubHub uses advanced AWS WAF protection. Applied multiple bypass techniques including OS randomization, extended wait times, and human behavior simulation.',
+                        'techniques_applied': [
+                            'OS fingerprint randomization',
+                            'Google search referer simulation',
+                            f'{AWS_WAF_RETRY_ATTEMPTS} retry attempts with delays',
+                            f'{AWS_WAF_WAIT_TIME}s wait time per attempt',
+                            'Human behavior simulation',
+                            'WebGL and WebRTC enabled',
+                            'Network idle detection',
+                            'Full DOM loading'
+                        ],
                         'recommendations': [
                             'Use StubHub Official API (recommended)',
-                            'Try with residential IP addresses',
+                            'Try with residential IP proxy service',
                             'Use official partnership programs',
-                            'Contact StubHub for API access'
+                            'Contact StubHub for API access',
+                            'Try at different times (less WAF activity)',
+                            'Consider alternative marketplaces'
                         ]
                     }
                 
@@ -361,24 +402,69 @@ class ScraplingScrapingService:
             # Step 2: Scrape ticket listings from event page
             logger.info(f"Scraping tickets from event page: {event_url}")
             
-            def fetch_event():
-                # Use stealth capabilities without solve_cloudflare for AWS WAF
-                # AWS WAF challenges need more time to load, not automated solving
-                return StealthyFetcher.fetch(
-                    event_url,
-                    headless=True,
-                    solve_cloudflare=False,  # Don't try to solve Cloudflare challenges - AWS WAF is different
-                    google_search=False,
-                    network_idle=True,
-                    wait=15000,  # Wait 15 seconds for ticket listings to load (milliseconds)
-                    humanize=True,  # Humanize cursor movement
-                    disable_resources=False,  # Ensure all page resources load
-                    os_randomize=False,
-                    timeout=60000  # Increase timeout to 60 seconds
-                )
+            # Apply same retry strategy for event page
+            event_page = None
+            for attempt in range(AWS_WAF_RETRY_ATTEMPTS):
+                try:
+                    logger.info(f"Fetching event page (Attempt {attempt + 1}/{AWS_WAF_RETRY_ATTEMPTS})")
+                    
+                    def fetch_event():
+                        # Use same advanced AWS WAF bypass techniques for event page
+                        def wait_for_tickets(page):
+                            """Wait for ticket listings to load after AWS WAF challenge"""
+                            time.sleep(AWS_WAF_WAIT_TIME)
+                            logger.info(f"Waited {AWS_WAF_WAIT_TIME} seconds for ticket listings to load")
+                        
+                        return StealthyFetcher.fetch(
+                            event_url,
+                            headless=True,
+                            solve_cloudflare=False,
+                            google_search=True,  # Simulate Google referer
+                            network_idle=True,
+                            wait=10000,
+                            humanize=True,
+                            disable_resources=False,
+                            os_randomize=True,  # Randomize OS fingerprints
+                            timeout=150000,
+                            load_dom=True,
+                            page_action=wait_for_tickets,
+                            allow_webgl=True,
+                            block_webrtc=False,
+                        )
+                    
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        event_page = await loop.run_in_executor(executor, fetch_event)
+                    
+                    # Check if AWS WAF challenge is present
+                    event_html = event_page.html if hasattr(event_page, 'html') else str(event_page)
+                    if 'aws-waf-token' in event_html.lower() or 'challenge-container' in event_html.lower():
+                        if attempt < AWS_WAF_RETRY_ATTEMPTS - 1:
+                            logger.warning(f"AWS WAF challenge on event page (Attempt {attempt + 1}), retrying...")
+                            await asyncio.sleep(AWS_WAF_RETRY_DELAY)
+                            continue
+                        else:
+                            logger.error(f"AWS WAF challenge persists on event page after {AWS_WAF_RETRY_ATTEMPTS} attempts")
+                            break
+                    
+                    # Successfully loaded event page
+                    logger.info("✅ Event page loaded successfully")
+                    break
+                    
+                except Exception as e:
+                    if attempt < AWS_WAF_RETRY_ATTEMPTS - 1:
+                        logger.warning(f"Event page fetch attempt {attempt + 1} failed: {e}, retrying...")
+                        await asyncio.sleep(AWS_WAF_RETRY_DELAY)
+                    else:
+                        logger.error(f"Failed to fetch event page after {AWS_WAF_RETRY_ATTEMPTS} attempts: {e}")
             
-            with concurrent.futures.ThreadPoolExecutor() as executor:
-                event_page = await loop.run_in_executor(executor, fetch_event)
+            if not event_page:
+                return {
+                    'status': 'error',
+                    'platform': 'stubhub',
+                    'error': 'Failed to load event page after multiple retry attempts',
+                    'listings': [],
+                    'timestamp': datetime.now().isoformat()
+                }
             
             # Extract ticket listings from event page
             # StubHub ticket listings have specific selectors
