@@ -230,7 +230,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 ### Run Security Tests
 
 ```bash
-cd /home/runner/work/SeatSync/SeatSync
+# From project root directory
 python3 -m pytest backend/tests/test_security.py -v
 ```
 
@@ -319,8 +319,10 @@ Only enable HSTS in production with valid SSL:
 
 ```python
 # In main.py
+from app.core.config import settings
+
 app.add_middleware(SecurityHeadersMiddleware, config={
-    "enable_hsts": os.getenv("NODE_ENV") == "production",
+    "enable_hsts": settings.NODE_ENV == "production",
     "hsts_max_age": 31536000,
     "hsts_include_subdomains": True,
     "hsts_preload": True
