@@ -4,16 +4,38 @@ Modern, efficient web scraping using the Scrapling library
 
 This service provides:
 - Adaptive element tracking (survives website structure changes)
-- Superior anti-bot detection bypass
+- Superior anti-bot detection bypass (Cloudflare, AWS WAF, etc.)
 - 685x faster parsing performance
-- Built-in TLS fingerprinting and Cloudflare bypass
+- Built-in TLS fingerprinting and challenge solving
 - Clean, simple API
+
+ANTI-BOT BYPASS CAPABILITIES:
+Scrapling uses StealthyFetcher with advanced capabilities:
+- Modified Firefox browser with fingerprint spoofing
+- Automatic Cloudflare Turnstile/Interstitial bypass
+- AWS WAF challenge solving
+- TLS fingerprint randomization
+- Realistic browser behavior simulation
+
+For best results during development:
+- Use full stealth mode (stealth=True)
+- Allow sufficient wait time for dynamic content (wait=3-5 seconds)
+- Enable solve_cloudflare for automatic challenge handling
+- Keep disable_resources=False to ensure proper page rendering
+
+If you still encounter blocks, consider:
+- Using residential IPs or proxy rotation
+- Adding random delays between requests
+- Running from different geographic locations
+- For production: official APIs still recommended for reliability
 """
 
 import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 import asyncio
+import re
+import urllib.parse
 
 logger = logging.getLogger(__name__)
 
@@ -140,85 +162,223 @@ class ScraplingScrapingService:
         """
         Scrape StubHub using Scrapling's advanced stealth features
         
-        This is MUCH simpler than the old implementation!
+        Two-step process:
+        1. If no event_url provided, search for events and find the first matching event URL
+        2. Navigate to event page and scrape actual ticket listings
         """
         try:
-            # Determine URL
-            if event_url:
-                url = event_url
-            else:
-                url = f'https://www.stubhub.com/find/s/?q={search_query or "sports"}'
-            
-            logger.info(f"Scraping StubHub with Scrapling: {url}")
-            
-            # Run Scrapling's sync fetch in a thread pool to avoid blocking the event loop
             import concurrent.futures
             loop = asyncio.get_event_loop()
             
-            def fetch_sync():
-                # Use StealthyFetcher with Cloudflare bypass
+            # Step 1: Find event URL if not provided
+            if not event_url:
+                if not search_query:
+                    return {
+                        'status': 'error',
+                        'platform': 'stubhub',
+                        'error': 'Either event_url or search_query must be provided',
+                        'listings': [],
+                        'timestamp': datetime.now().isoformat()
+                    }
+                
+                # Search for events on StubHub
+                # StubHub structure: performer pages list all events for a team/artist
+                encoded_query = urllib.parse.quote(search_query)
+                
+                # Try multiple URL formats for StubHub
+                # Format: https://www.stubhub.com/{team-slug}-tickets/performer/{id}
+                # We'll try the direct performer page format first
+                performer_slug = search_query.lower().replace(' ', '-')
+                search_urls = [
+                    f'https://www.stubhub.com/{performer_slug}-tickets',
+                    f'https://www.stubhub.com/find?q={encoded_query}',
+                ]
+                
+                logger.info(f"Searching StubHub for: {search_query}")
+                
+                search_page = None
+                successful_url = None
+                
+                for search_url in search_urls:
+                    try:
+                        logger.info(f"Trying URL: {search_url}")
+                        
+                        def fetch_search():
+                            # Use Scrapling's full stealth capabilities to bypass AWS WAF
+                            return StealthyFetcher.fetch(
+                                search_url,
+                                headless=True,
+                                solve_cloudflare=True,  # Handles Cloudflare, AWS WAF, and other challenges
+                                google_search=False,
+                                network_idle=True,
+                                wait=3000,  # Wait 3 seconds for dynamic content (milliseconds)
+                                humanize=True,  # Humanize cursor movement
+                                disable_resources=False,  # Load all resources for proper rendering
+                                os_randomize=False  # Match OS fingerprints with current system
+                            )
+                        
+                        with concurrent.futures.ThreadPoolExecutor() as executor:
+                            page = await loop.run_in_executor(executor, fetch_search)
+                        
+                        # Check if we got an AWS WAF challenge page
+                        page_html = page.html if hasattr(page, 'html') else str(page)
+                        if 'aws-waf-token' in page_html.lower() or 'challenge-container' in page_html.lower():
+                            logger.warning(f"AWS WAF challenge detected on {search_url}, Scrapling should handle this automatically")
+                            # Scrapling's solve_cloudflare should handle AWS WAF challenges too
+                            # If we still get blocked, the page may need more time or different approach
+                        
+                        # Check if page loaded successfully (not a 404 or challenge page)
+                        # We can check this by looking for event links or performer content
+                        test_links = page.css('a[href*="/event/"], a[data-testid*="event"], [class*="event"]')
+                        if test_links:
+                            search_page = page
+                            successful_url = search_url
+                            logger.info(f"Successfully loaded page with events: {search_url}")
+                            break
+                        else:
+                            logger.info(f"Page loaded but no events found: {search_url}")
+                    except Exception as e:
+                        logger.debug(f"Failed to load {search_url}: {e}")
+                        continue
+                
+                if not search_page:
+                    logger.warning(f"Could not load any StubHub page for: {search_query}")
+                    return {
+                        'status': 'success',
+                        'platform': 'stubhub',
+                        'url': search_urls[0],
+                        'listings': [],
+                        'count': 0,
+                        'timestamp': datetime.now().isoformat(),
+                        'scraper': 'scrapling',
+                        'message': f'Could not find events page for "{search_query}". URLs tried: {len(search_urls)}'
+                    }
+                
+                # Find event links on the page
+                event_links = search_page.css('a[href*="/event/"], a[data-testid*="event"], .eventCard a, .event-card a')
+                
+                if not event_links:
+                    logger.warning(f"No event links found for: {search_query}")
+                    return {
+                        'status': 'success',
+                        'platform': 'stubhub',
+                        'url': successful_url,
+                        'listings': [],
+                        'count': 0,
+                        'timestamp': datetime.now().isoformat(),
+                        'scraper': 'scrapling',
+                        'message': f'No events found for "{search_query}"'
+                    }
+                
+                # Get the first event URL
+                first_event = event_links[0]
+                event_href = first_event.attrib.get('href', '')
+                
+                # Handle relative URLs
+                if event_href.startswith('/'):
+                    event_url = f'https://www.stubhub.com{event_href}'
+                elif event_href.startswith('http'):
+                    event_url = event_href
+                else:
+                    logger.warning(f"Invalid event URL format: {event_href}")
+                    return {
+                        'status': 'error',
+                        'platform': 'stubhub',
+                        'error': f'Could not find valid event URL for "{search_query}"',
+                        'listings': [],
+                        'timestamp': datetime.now().isoformat()
+                    }
+                
+                logger.info(f"Found event URL: {event_url}")
+            
+            # Step 2: Scrape ticket listings from event page
+            logger.info(f"Scraping tickets from event page: {event_url}")
+            
+            def fetch_event():
+                # Use full stealth capabilities to bypass anti-bot protection
                 return StealthyFetcher.fetch(
-                    url,
+                    event_url,
                     headless=True,
-                    solve_cloudflare=True,  # Auto-bypass Cloudflare!
+                    solve_cloudflare=True,  # Handles Cloudflare, AWS WAF, and other challenges
                     google_search=False,
-                    network_idle=True
+                    network_idle=True,
+                    wait=5000,  # Wait 5 seconds for ticket listings to load (milliseconds)
+                    humanize=True,  # Humanize cursor movement
+                    disable_resources=False,  # Ensure all page resources load
+                    os_randomize=False
                 )
             
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                page = await loop.run_in_executor(executor, fetch_sync)
+                event_page = await loop.run_in_executor(executor, fetch_event)
             
-            # Extract listings using adaptive selection if enabled
-            # Scrapling's adaptive feature will find elements even if selectors change!
+            # Extract ticket listings from event page
+            # StubHub ticket listings have specific selectors
             if adaptive:
-                # Use adaptive mode - Scrapling will find similar elements
-                listing_elements = page.css('[data-testid*="listing"], .sc-listing, .EventCard', adaptive=True)
+                listing_elements = event_page.css(
+                    '[data-testid*="ticket"], [data-testid*="listing"], .ticket-card, .listing-row, .inventory-listing',
+                    adaptive=True
+                )
             else:
-                # First time scraping - use auto_save to remember the structure
-                listing_elements = page.css('[data-testid*="listing"], .sc-listing, .EventCard', auto_save=True)
+                listing_elements = event_page.css(
+                    '[data-testid*="ticket"], [data-testid*="listing"], .ticket-card, .listing-row, .inventory-listing',
+                    auto_save=True
+                )
             
-            # Extract data from listings
+            # Extract data from ticket listings
             listings = []
             for element in listing_elements:
                 try:
-                    # Extract price - Scrapling supports multiple methods
-                    price_element = element.css_first('[data-testid*="price"], .price, .PriceLabel')
+                    # Extract price - try multiple selectors
+                    price_element = element.css_first(
+                        '[data-testid*="price"], [class*="price"], .price, .Price, span[class*="Price"]'
+                    )
                     price_text = price_element.text if price_element else None
                     
                     if price_text:
-                        # Clean price
-                        price = float(price_text.replace('$', '').replace(',', '').strip())
-                        
-                        # Extract section
-                        section_element = element.css_first('[data-testid*="section"], .section')
-                        section = section_element.text if section_element else ''
-                        
-                        # Extract row
-                        row_element = element.css_first('[data-testid*="row"], .row')
-                        row = row_element.text if row_element else ''
-                        
-                        # Extract quantity
-                        qty_element = element.css_first('[data-testid*="quantity"], .quantity')
-                        qty_text = qty_element.text if qty_element else '1'
-                        quantity = int(''.join(filter(str.isdigit, qty_text)) or '1')
-                        
-                        listings.append({
-                            'price': price,
-                            'section': section,
-                            'row': row,
-                            'quantity': quantity,
-                            'platform': 'stubhub'
-                        })
+                        # Clean price - remove $, commas, "each", etc.
+                        price_match = re.search(r'[\d,]+\.?\d*', price_text.replace(',', ''))
+                        if price_match:
+                            price = float(price_match.group())
+                            
+                            # Extract section
+                            section_element = element.css_first(
+                                '[data-testid*="section"], [class*="section"], .section, .Section'
+                            )
+                            section = section_element.text.strip() if section_element else ''
+                            
+                            # Extract row
+                            row_element = element.css_first(
+                                '[data-testid*="row"], [class*="row"], .row, .Row'
+                            )
+                            row = row_element.text.strip() if row_element else ''
+                            
+                            # Extract quantity
+                            qty_element = element.css_first(
+                                '[data-testid*="quantity"], [class*="quantity"], .quantity, .Quantity'
+                            )
+                            if qty_element:
+                                qty_text = qty_element.text
+                                quantity = int(''.join(filter(str.isdigit, qty_text)) or '1')
+                            else:
+                                quantity = 1
+                            
+                            listings.append({
+                                'price': price,
+                                'section': section,
+                                'row': row,
+                                'quantity': quantity,
+                                'platform': 'stubhub'
+                            })
                 except Exception as e:
-                    logger.debug(f"Error parsing listing element: {e}")
+                    logger.debug(f"Error parsing ticket listing: {e}")
                     continue
             
-            logger.info(f"StubHub: Found {len(listings)} listings with Scrapling")
+            logger.info(f"StubHub: Found {len(listings)} ticket listings")
             
             return {
                 'status': 'success',
                 'platform': 'stubhub',
-                'url': url,
+                'url': event_url,
                 'listings': listings,
                 'count': len(listings),
                 'timestamp': datetime.now().isoformat(),
@@ -226,7 +386,7 @@ class ScraplingScrapingService:
             }
             
         except Exception as e:
-            logger.error(f"StubHub scraping error: {e}")
+            logger.error(f"StubHub scraping error: {e}", exc_info=True)
             return {
                 'status': 'error',
                 'platform': 'stubhub',
@@ -241,53 +401,202 @@ class ScraplingScrapingService:
         search_query: Optional[str] = None,
         adaptive: bool = False
     ) -> Dict[str, Any]:
-        """Scrape SeatGeek using Scrapling"""
+        """
+        Scrape SeatGeek using Scrapling
+        
+        Two-step process:
+        1. If no event_url provided, search for events and find the first matching event URL
+        2. Navigate to event page and scrape actual ticket listings
+        """
         try:
-            url = event_url or f'https://seatgeek.com/search?q={search_query or "sports"}'
-            logger.info(f"Scraping SeatGeek with Scrapling: {url}")
-            
-            # Run in thread pool
             import concurrent.futures
             loop = asyncio.get_event_loop()
             
-            def fetch_sync():
-                return StealthyFetcher.fetch(url, headless=True, network_idle=True)
+            # Step 1: Find event URL if not provided
+            if not event_url:
+                if not search_query:
+                    return {
+                        'status': 'error',
+                        'platform': 'seatgeek',
+                        'error': 'Either event_url or search_query must be provided',
+                        'listings': [],
+                        'timestamp': datetime.now().isoformat()
+                    }
+                
+                # Search for events on SeatGeek
+                encoded_query = urllib.parse.quote(search_query)
+                
+                # Try multiple URL formats for SeatGeek
+                performer_slug = search_query.lower().replace(' ', '-')
+                search_urls = [
+                    f'https://seatgeek.com/{performer_slug}-tickets',
+                    f'https://seatgeek.com/search?q={encoded_query}',
+                ]
+                
+                logger.info(f"Searching SeatGeek for: {search_query}")
+                
+                search_page = None
+                successful_url = None
+                
+                for search_url in search_urls:
+                    try:
+                        logger.info(f"Trying URL: {search_url}")
+                        
+                        def fetch_search():
+                            # Use full stealth capabilities for SeatGeek as well
+                            return StealthyFetcher.fetch(
+                                search_url,
+                                headless=True,
+                                solve_cloudflare=True,
+                                google_search=False,
+                                network_idle=True,
+                                wait=3000,
+                                humanize=True,
+                                disable_resources=False,
+                                os_randomize=False
+                            )
+                        
+                        with concurrent.futures.ThreadPoolExecutor() as executor:
+                            page = await loop.run_in_executor(executor, fetch_search)
+                        
+                        # Check if page loaded successfully
+                        test_links = page.css('a[href*="/event/"], a[href*="-tickets-"]')
+                        if test_links:
+                            search_page = page
+                            successful_url = search_url
+                            logger.info(f"Successfully loaded page with events: {search_url}")
+                            break
+                        else:
+                            logger.info(f"Page loaded but no events found: {search_url}")
+                    except Exception as e:
+                        logger.debug(f"Failed to load {search_url}: {e}")
+                        continue
+                
+                if not search_page:
+                    logger.warning(f"Could not load any SeatGeek page for: {search_query}")
+                    return {
+                        'status': 'success',
+                        'platform': 'seatgeek',
+                        'url': search_urls[0],
+                        'listings': [],
+                        'count': 0,
+                        'timestamp': datetime.now().isoformat(),
+                        'scraper': 'scrapling',
+                        'message': f'Could not find events page for "{search_query}"'
+                    }
+                
+                # Find event links on the page
+                event_links = search_page.css('a[href*="/event/"], a[href*="-tickets-"], .event-card a, .EventCard a')
+                
+                if not event_links:
+                    logger.warning(f"No event links found for: {search_query}")
+                    return {
+                        'status': 'success',
+                        'platform': 'seatgeek',
+                        'url': successful_url,
+                        'listings': [],
+                        'count': 0,
+                        'timestamp': datetime.now().isoformat(),
+                        'scraper': 'scrapling',
+                        'message': f'No events found for "{search_query}"'
+                    }
+                
+                # Get the first event URL
+                first_event = event_links[0]
+                event_href = first_event.attrib.get('href', '')
+                
+                # Handle relative URLs
+                if event_href.startswith('/'):
+                    event_url = f'https://seatgeek.com{event_href}'
+                elif event_href.startswith('http'):
+                    event_url = event_href
+                else:
+                    logger.warning(f"Invalid event URL format: {event_href}")
+                    return {
+                        'status': 'error',
+                        'platform': 'seatgeek',
+                        'error': f'Could not find valid event URL for "{search_query}"',
+                        'listings': [],
+                        'timestamp': datetime.now().isoformat()
+                    }
+                
+                logger.info(f"Found event URL: {event_url}")
+            
+            # Step 2: Scrape ticket listings from event page
+            logger.info(f"Scraping tickets from event page: {event_url}")
+            
+            def fetch_event():
+                # Use full stealth capabilities for event page
+                return StealthyFetcher.fetch(
+                    event_url,
+                    headless=True,
+                    solve_cloudflare=True,
+                    google_search=False,
+                    network_idle=True,
+                    wait=5000,
+                    humanize=True,
+                    disable_resources=False,
+                    os_randomize=False
+                )
             
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                page = await loop.run_in_executor(executor, fetch_sync)
+                event_page = await loop.run_in_executor(executor, fetch_event)
             
-            # Use adaptive selection
-            listing_elements = page.css(
-                '[data-testid="listing"], .listing, .EventCard',
-                adaptive=adaptive,
-                auto_save=not adaptive
-            )
+            # Extract ticket listings from event page
+            # SeatGeek ticket listings have specific selectors
+            if adaptive:
+                listing_elements = event_page.css(
+                    '[data-testid*="listing"], .listing, .ticket-listing, [class*="TicketListing"]',
+                    adaptive=True
+                )
+            else:
+                listing_elements = event_page.css(
+                    '[data-testid*="listing"], .listing, .ticket-listing, [class*="TicketListing"]',
+                    auto_save=True
+                )
             
             listings = []
             for element in listing_elements:
                 try:
-                    price_element = element.css_first('[data-testid="price"], .price')
+                    price_element = element.css_first(
+                        '[data-testid*="price"], [class*="price"], .price, .Price'
+                    )
+                    
                     if price_element and price_element.text:
-                        price = float(price_element.text.replace('$', '').replace(',', '').strip())
-                        
-                        section_element = element.css_first('[data-testid="section"], .section')
-                        section = section_element.text if section_element else ''
-                        
-                        listings.append({
-                            'price': price,
-                            'section': section,
-                            'platform': 'seatgeek'
-                        })
+                        # Clean price
+                        price_text = price_element.text
+                        price_match = re.search(r'[\d,]+\.?\d*', price_text.replace(',', ''))
+                        if price_match:
+                            price = float(price_match.group())
+                            
+                            # Extract section
+                            section_element = element.css_first(
+                                '[data-testid*="section"], [class*="section"], .section, .Section'
+                            )
+                            section = section_element.text.strip() if section_element else ''
+                            
+                            # Extract row
+                            row_element = element.css_first(
+                                '[data-testid*="row"], [class*="row"], .row, .Row'
+                            )
+                            row = row_element.text.strip() if row_element else ''
+                            
+                            listings.append({
+                                'price': price,
+                                'section': section,
+                                'row': row,
+                                'platform': 'seatgeek'
+                            })
                 except Exception as e:
                     logger.debug(f"Error parsing listing: {e}")
                     continue
             
-            logger.info(f"SeatGeek: Found {len(listings)} listings")
+            logger.info(f"SeatGeek: Found {len(listings)} ticket listings")
             
             return {
                 'status': 'success',
                 'platform': 'seatgeek',
-                'url': url,
+                'url': event_url,
                 'listings': listings,
                 'count': len(listings),
                 'timestamp': datetime.now().isoformat(),
@@ -295,7 +604,7 @@ class ScraplingScrapingService:
             }
             
         except Exception as e:
-            logger.error(f"SeatGeek scraping error: {e}")
+            logger.error(f"SeatGeek scraping error: {e}", exc_info=True)
             return {
                 'status': 'error',
                 'platform': 'seatgeek',
