@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 class MarketplaceAccountCreate(BaseModel):
-    platform: str  # 'stubhub', 'seatgeek', 'ticketmaster'
+    platform: str  # 'seatgeek', 'ticketmaster', 'vividseats'
     access_token: str
     refresh_token: str = None
     account_id: str = None

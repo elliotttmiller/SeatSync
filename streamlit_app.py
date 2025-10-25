@@ -345,7 +345,7 @@ def show_scraping():
     with col1:
         marketplace = st.selectbox(
             "Choose marketplace to scrape",
-            ["StubHub", "SeatGeek", "Ticketmaster", "VividSeats"],
+            ["SeatGeek", "Ticketmaster", "VividSeats"],
             help="Scrapling supports all major marketplaces"
         )
     

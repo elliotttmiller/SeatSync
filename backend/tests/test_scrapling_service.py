@@ -128,9 +128,9 @@ async def test_scrapling_marketplace_routing():
     """Test that marketplace names are routed correctly"""
     service = await get_scrapling_service()
     
-    # Test with stubhub (should not raise exception)
+    # Test with seatgeek (should not raise exception)
     result = await service.scrape_marketplace(
-        marketplace="stubhub",
+        marketplace="seatgeek",
         search_query="test"
     )
     
@@ -154,7 +154,7 @@ async def test_scrapling_adaptive_mode():
     
     # Test with adaptive=True
     result = await service.scrape_marketplace(
-        marketplace="stubhub",
+        marketplace="seatgeek",
         search_query="test",
         adaptive=True  # This is the killer feature!
     )

@@ -144,7 +144,6 @@ class ScrapingService:
             return []
         
         return [
-            'stubhub',
             'seatgeek',
             'ticketmaster',
             'vividseats',
