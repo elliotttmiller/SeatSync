@@ -119,6 +119,9 @@ class ScraplingScraperService:
         """
         Create a new Fetcher instance with optimal configuration.
         
+        Note: Each request gets a fresh Fetcher to ensure proper browser
+        rotation and avoid session fingerprinting issues.
+        
         Args:
             adaptive: Enable adaptive parsing (survives DOM changes)
             
@@ -129,9 +132,34 @@ class ScraplingScraperService:
         
         # Configure parser for adaptive tracking if requested
         if adaptive:
-            fetcher.adaptive = True  # Enable adaptive element tracking
+            fetcher.configure(adaptive=True)
         
         return fetcher
+    
+    def _find_elements_with_fallback(self, page, selectors: List[str], context: str = "elements") -> List:
+        """
+        Try multiple selectors and return elements from the first successful match.
+        
+        Args:
+            page: The page/response object to search
+            selectors: List of CSS selectors to try in order
+            context: Description of what we're looking for (for logging)
+            
+        Returns:
+            List of elements or empty list if none found
+        """
+        for selector in selectors:
+            try:
+                elements = page.css(selector)
+                if elements and len(elements) > 0:
+                    logger.info(f"Found {len(elements)} {context} using selector: {selector}")
+                    return elements
+            except Exception as e:
+                logger.debug(f"Selector '{selector}' failed: {e}")
+                continue
+        
+        logger.warning(f"No {context} found with any selector")
+        return []
     
     async def scrape_marketplace(
         self,
@@ -340,8 +368,8 @@ class ScraplingScraperService:
                             
                             page = await run_sync_fetch(fetch_search)
                             
-                            # Check for AWS WAF challenge or success
-                            page_text = page.text if hasattr(page, 'text') else str(page)
+                            # Check for AWS WAF challenge (check first 5000 chars for efficiency)
+                            page_text = page.text[:5000] if hasattr(page, 'text') else str(page)[:5000]
                             
                             # Check if we're blocked
                             if 'aws-waf-token' in page_text.lower() or 'challenge-container' in page_text.lower():
@@ -357,18 +385,11 @@ class ScraplingScraperService:
                                 'body',
                             ]
                             
-                            for selector in test_selectors:
-                                try:
-                                    elements = page.css(selector)
-                                    if elements and len(elements) > 0:
-                                        search_page = page
-                                        successful_url = search_url
-                                        logger.info(f"✅ Successfully loaded page with {len(elements)} elements")
-                                        break
-                                except Exception:
-                                    continue
-                            
-                            if search_page:
+                            found_elements = self._find_elements_with_fallback(page, test_selectors, "page elements")
+                            if found_elements:
+                                search_page = page
+                                successful_url = search_url
+                                logger.info(f"✅ Successfully loaded page")
                                 break
                             
                         except Exception as e:
@@ -448,16 +469,7 @@ class ScraplingScraperService:
                 '[class*="ListingRow"]',
             ]
             
-            listing_elements = []
-            for selector in listing_selectors:
-                try:
-                    elements = event_page.css(selector)
-                    if elements and len(elements) > 0:
-                        listing_elements = elements
-                        logger.info(f"Found {len(elements)} listings using selector: {selector}")
-                        break
-                except Exception:
-                    continue
+            listing_elements = self._find_elements_with_fallback(event_page, listing_selectors, "listings")
             
             listings = []
             for element in listing_elements:
@@ -506,7 +518,7 @@ class ScraplingScraperService:
                                 'platform': 'stubhub'
                             })
                 except Exception as e:
-                    logger.debug(f"Error parsing listing: {e}")
+                    logger.debug(f"StubHub: Error parsing listing: {e}")
             
             logger.info(f"StubHub: Found {len(listings)} listings")
             
@@ -619,16 +631,7 @@ class ScraplingScraperService:
                 '[class*="TicketCard"]',
             ]
             
-            listing_elements = []
-            for selector in listing_selectors:
-                try:
-                    elements = event_page.css(selector)
-                    if elements and len(elements) > 0:
-                        listing_elements = elements
-                        logger.info(f"Found {len(elements)} listings using selector: {selector}")
-                        break
-                except Exception:
-                    continue
+            listing_elements = self._find_elements_with_fallback(event_page, listing_selectors, "listings")
             
             listings = []
             for element in listing_elements:
@@ -668,7 +671,7 @@ class ScraplingScraperService:
                                 'platform': 'seatgeek'
                             })
                 except Exception as e:
-                    logger.debug(f"Error parsing listing: {e}")
+                    logger.debug(f"SeatGeek: Error parsing listing: {e}")
             
             logger.info(f"SeatGeek: Found {len(listings)} listings")
             
@@ -719,16 +722,7 @@ class ScraplingScraperService:
                 '[class*="Offer"]',
             ]
             
-            listing_elements = []
-            for selector in listing_selectors:
-                try:
-                    elements = page.css(selector)
-                    if elements and len(elements) > 0:
-                        listing_elements = elements
-                        logger.info(f"Found {len(elements)} listings using selector: {selector}")
-                        break
-                except Exception:
-                    continue
+            listing_elements = self._find_elements_with_fallback(page, listing_selectors, "listings")
             
             listings = []
             for element in listing_elements:
@@ -762,9 +756,9 @@ class ScraplingScraperService:
                                 'platform': 'ticketmaster'
                             })
                         except ValueError:
-                            logger.debug(f"Could not parse price: {price_text}")
+                            logger.debug(f"Ticketmaster: Could not parse price: {price_text}")
                 except Exception as e:
-                    logger.debug(f"Error parsing listing: {e}")
+                    logger.debug(f"Ticketmaster: Error parsing listing: {e}")
             
             logger.info(f"Ticketmaster: Found {len(listings)} listings")
             
@@ -815,16 +809,7 @@ class ScraplingScraperService:
                 '[class*="ProductionListItem"]',
             ]
             
-            listing_elements = []
-            for selector in listing_selectors:
-                try:
-                    elements = page.css(selector)
-                    if elements and len(elements) > 0:
-                        listing_elements = elements
-                        logger.info(f"Found {len(elements)} listings using selector: {selector}")
-                        break
-                except Exception:
-                    continue
+            listing_elements = self._find_elements_with_fallback(page, listing_selectors, "listings")
             
             listings = []
             for element in listing_elements:
@@ -858,9 +843,9 @@ class ScraplingScraperService:
                                 'platform': 'vividseats'
                             })
                         except ValueError:
-                            logger.debug(f"Could not parse price: {price_text}")
+                            logger.debug(f"VividSeats: Could not parse price: {price_text}")
                 except Exception as e:
-                    logger.debug(f"Error parsing listing: {e}")
+                    logger.debug(f"VividSeats: Error parsing listing: {e}")
             
             logger.info(f"Vivid Seats: Found {len(listings)} listings")
             
