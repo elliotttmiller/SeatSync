@@ -337,43 +337,64 @@ def show_scraping():
         st.code("pip install 'scrapling[all]>=0.3.7'\nscrapling install")
         return
     
-    # Marketplace selection
-    st.markdown('<p class="sub-header">Select Marketplace</p>', unsafe_allow_html=True)
+    # Search query input (no marketplace selection - scrape all by default)
+    st.markdown('<p class="sub-header">Search Configuration</p>', unsafe_allow_html=True)
     
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        marketplace = st.selectbox(
-            "Choose marketplace to scrape",
-            ["StubHub", "SeatGeek", "Ticketmaster", "VividSeats"],
-            help="Scrapling supports all major marketplaces"
-        )
-    
-    with col2:
         search_query = st.text_input(
             "Search Query",
             value="Lakers",
             help="Enter team name or event"
         )
     
-    # Adaptive tracking option (Scrapling's killer feature!)
-    adaptive_mode = st.checkbox(
-        "🎯 Use Adaptive Tracking",
-        value=False,
-        help="Enable if website structure has changed. Scrapling will automatically find elements!"
-    )
+    with col2:
+        # Adaptive tracking option (Scrapling's killer feature!)
+        adaptive_mode = st.checkbox(
+            "🎯 Use Adaptive Tracking",
+            value=False,
+            help="Enable if website structure has changed. Scrapling will automatically find elements!"
+        )
+    
+    # Optional: Allow user to opt out of certain marketplaces
+    with st.expander("🎯 Select Marketplaces", expanded=False):
+        st.markdown("**Choose which marketplaces to scrape:**")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            scrape_stubhub = st.checkbox("StubHub", value=True)
+        with col2:
+            scrape_seatgeek = st.checkbox("SeatGeek", value=True)
+        with col3:
+            scrape_ticketmaster = st.checkbox("Ticketmaster", value=True)
+        with col4:
+            scrape_vividseats = st.checkbox("VividSeats", value=True)
+        
+        # Build list of selected marketplaces
+        selected_marketplaces = []
+        if scrape_stubhub:
+            selected_marketplaces.append("stubhub")
+        if scrape_seatgeek:
+            selected_marketplaces.append("seatgeek")
+        if scrape_ticketmaster:
+            selected_marketplaces.append("ticketmaster")
+        if scrape_vividseats:
+            selected_marketplaces.append("vividseats")
+        
+        if not selected_marketplaces:
+            st.warning("⚠️ Please select at least one marketplace to scrape")
     
     # Scraping configuration
     with st.expander("⚙️ Advanced Scraping Configuration", expanded=False):
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            rate_limit = st.number_input(
-                "Rate Limit (requests/min)",
-                min_value=10,
-                max_value=60,
-                value=30,
-                help="Number of requests per minute"
+            concurrent_mode = st.checkbox(
+                "⚡ Concurrent Scraping",
+                value=True,
+                help="Scrape marketplaces concurrently for faster results"
             )
         
         with col2:
@@ -391,71 +412,116 @@ def show_scraping():
             )
     
     # Scrape button
-    if st.button("🚀 Start Scraping", type="primary"):
-        with st.spinner(f"Scraping {marketplace} for '{search_query}' with Scrapling..."):
-            result = run_scraping(marketplace, search_query, adaptive_mode)
+    if st.button("🚀 Start Scraping All Marketplaces", type="primary"):
+        if not selected_marketplaces:
+            st.error("❌ Please select at least one marketplace to scrape")
+            return
+            
+        scrape_mode = "concurrent" if concurrent_mode else "sequential"
+        with st.spinner(f"Scraping {len(selected_marketplaces)} marketplace(s) {scrape_mode}ly for '{search_query}' with Scrapling..."):
+            result = run_full_scrape(search_query, adaptive_mode, selected_marketplaces, concurrent_mode)
             
             if result:
                 st.session_state.scraping_results.append(result)
                 
-                if result.get('status') == 'success':
-                    st.success(f"✅ Successfully scraped {len(result.get('listings', []))} listings!")
-                    
-                    # Display results
-                    if result.get('listings'):
-                        st.markdown('<p class="sub-header">Scraped Data</p>', unsafe_allow_html=True)
-                        
-                        df_listings = pd.DataFrame(result['listings'][:100])  # Limit to 100 for display
-                        
-                        # Show summary stats
-                        col1, col2, col3, col4 = st.columns(4)
-                        
-                        with col1:
-                            st.metric("Total Listings", len(result['listings']))
-                        
-                        with col2:
-                            if 'price' in df_listings.columns:
-                                st.metric("Avg Price", f"${df_listings['price'].mean():.2f}")
-                        
-                        with col3:
-                            if 'price' in df_listings.columns:
-                                st.metric("Min Price", f"${df_listings['price'].min():.2f}")
-                        
-                        with col4:
-                            if 'price' in df_listings.columns:
-                                st.metric("Max Price", f"${df_listings['price'].max():.2f}")
-                        
-                        # Display data table
-                        st.dataframe(df_listings, width="stretch")
-                        
-                        # Price distribution chart
-                        if 'price' in df_listings.columns:
-                            st.markdown("**Price Distribution**")
-                            fig = px.histogram(
-                                df_listings,
-                                x='price',
-                                nbins=30,
-                                title='Listing Price Distribution'
-                            )
-                            st.plotly_chart(fig, width="stretch")
+                # Display aggregate results
+                st.markdown('<p class="sub-header">Aggregate Results</p>', unsafe_allow_html=True)
+                
+                # Summary metrics
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    st.metric("Total Listings", result.get('total_listings', 0))
+                
+                with col2:
+                    summary = result.get('summary', {})
+                    st.metric("Successful", f"{summary.get('successful', 0)}/{summary.get('total', 0)}")
+                
+                with col3:
+                    if result.get('status') == 'success':
+                        st.metric("Status", "✅ Success", delta="All OK")
+                    elif result.get('status') == 'partial':
+                        st.metric("Status", "⚠️ Partial", delta="Some failed")
                     else:
-                        st.info("ℹ️ No listings found. The page loaded successfully but contained no ticket data.")
-                else:
-                    # Scraping failed - show detailed error
-                    st.error(f"❌ Scraping failed: {result.get('error', 'Unknown error')}")
+                        st.metric("Status", "❌ Failed", delta="Check logs")
+                
+                with col4:
+                    # Calculate average price if we have listings
+                    all_listings = result.get('listings', [])
+                    if all_listings:
+                        avg_price = sum(l.get('price', 0) for l in all_listings if 'price' in l) / len([l for l in all_listings if 'price' in l])
+                        st.metric("Avg Price", f"${avg_price:.2f}")
+                    else:
+                        st.metric("Avg Price", "N/A")
+                
+                # Per-marketplace breakdown
+                st.markdown('<p class="sub-header">Per-Marketplace Results</p>', unsafe_allow_html=True)
+                
+                per_marketplace = result.get('per_marketplace', {})
+                
+                for marketplace, mp_result in per_marketplace.items():
+                    with st.expander(f"📊 {marketplace.upper()} - {len(mp_result.get('listings', []))} listings", expanded=True):
+                        if mp_result.get('status') == 'success':
+                            st.success(f"✅ Successfully scraped {len(mp_result.get('listings', []))} listings")
+                            
+                            listings = mp_result.get('listings', [])
+                            if listings:
+                                # Show first few listings
+                                df_listings = pd.DataFrame(listings[:50])
+                                
+                                # Summary for this marketplace
+                                subcol1, subcol2, subcol3 = st.columns(3)
+                                with subcol1:
+                                    st.metric("Listings", len(listings))
+                                with subcol2:
+                                    if 'price' in df_listings.columns:
+                                        st.metric("Avg Price", f"${df_listings['price'].mean():.2f}")
+                                with subcol3:
+                                    if 'price' in df_listings.columns:
+                                        st.metric("Min Price", f"${df_listings['price'].min():.2f}")
+                                
+                                # Show data table
+                                st.dataframe(df_listings, use_container_width=True)
+                            else:
+                                st.info("ℹ️ No listings found")
+                        else:
+                            st.error(f"❌ Failed: {mp_result.get('error', 'Unknown error')}")
+                            
+                            # Show additional context
+                            if mp_result.get('message'):
+                                st.warning(f"ℹ️ {mp_result.get('message')}")
+                            
+                            # Show recommendations if available
+                            if mp_result.get('recommendations'):
+                                st.markdown("**Recommended Solutions:**")
+                                for rec in mp_result['recommendations']:
+                                    st.markdown(f"- {rec}")
+                
+                # Show errors if any
+                errors = result.get('summary', {}).get('errors')
+                if errors:
+                    st.markdown("---")
+                    st.markdown('<p class="sub-header">⚠️ Errors</p>', unsafe_allow_html=True)
+                    for error in errors:
+                        st.error(error)
+                
+                # Combined price distribution if we have listings
+                all_listings = result.get('listings', [])
+                if all_listings:
+                    st.markdown("---")
+                    st.markdown('<p class="sub-header">Combined Price Distribution</p>', unsafe_allow_html=True)
                     
-                    # Show additional context if available
-                    if result.get('message'):
-                        st.warning(f"ℹ️ {result.get('message')}")
-                    
-                    # Show recommendations if available
-                    if result.get('recommendations'):
-                        st.markdown("**Recommended Solutions:**")
-                        for rec in result['recommendations']:
-                            st.markdown(f"- {rec}")
-                        
-                        # Show link to documentation
-                        st.info("📖 See AWS_WAF_LIMITATION.md for detailed information about this limitation.")
+                    df_all = pd.DataFrame(all_listings)
+                    if 'price' in df_all.columns:
+                        fig = px.histogram(
+                            df_all,
+                            x='price',
+                            color='platform',
+                            nbins=30,
+                            title='Price Distribution Across All Marketplaces',
+                            barmode='overlay'
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
     
     # Display scraping history
     if st.session_state.scraping_results:
@@ -464,48 +530,81 @@ def show_scraping():
         
         history_data = []
         for i, result in enumerate(st.session_state.scraping_results):
-            history_data.append({
-                'Session': i + 1,
-                'Platform': result.get('platform', 'Unknown'),
-                'Listings': len(result.get('listings', [])),
-                'Status': result.get('status', 'unknown'),
-                'Timestamp': result.get('timestamp', 'N/A')
-            })
+            # Handle both single and multi-marketplace results
+            if 'per_marketplace' in result:
+                # Multi-marketplace result
+                for marketplace, mp_result in result.get('per_marketplace', {}).items():
+                    history_data.append({
+                        'Session': i + 1,
+                        'Type': 'Multi',
+                        'Platform': marketplace,
+                        'Listings': len(mp_result.get('listings', [])),
+                        'Status': mp_result.get('status', 'unknown'),
+                        'Timestamp': result.get('timestamp', 'N/A')
+                    })
+            else:
+                # Single marketplace result
+                history_data.append({
+                    'Session': i + 1,
+                    'Type': 'Single',
+                    'Platform': result.get('platform', 'Unknown'),
+                    'Listings': len(result.get('listings', [])),
+                    'Status': result.get('status', 'unknown'),
+                    'Timestamp': result.get('timestamp', 'N/A')
+                })
         
         df_history = pd.DataFrame(history_data)
-        st.dataframe(df_history, width="stretch")
+        st.dataframe(df_history, use_container_width=True)
 
 
-def run_scraping(marketplace: str, search_query: str, adaptive: bool = False) -> Dict[str, Any]:
-    """Run real scraping task using Scrapling-powered backend services"""
+def run_full_scrape(search_query: str, adaptive: bool = False, marketplaces: Optional[List[str]] = None, concurrent: bool = True) -> Dict[str, Any]:
+    """Run full scrape across all selected marketplaces using Scrapling-powered backend services"""
     try:
         if not BACKEND_AVAILABLE:
             return {
                 'status': 'error',
-                'platform': marketplace.lower(),
+                'total_listings': 0,
                 'listings': [],
-                'error': 'Backend services not available. Please check imports.',
+                'per_marketplace': {},
+                'summary': {
+                    'error': 'Backend services not available. Please check imports.',
+                    'successful': 0,
+                    'failed': 0,
+                    'total': 0
+                },
                 'timestamp': datetime.now().isoformat()
             }
         
         if not SCRAPLING_AVAILABLE:
             return {
                 'status': 'error',
-                'platform': marketplace.lower(),
+                'total_listings': 0,
                 'listings': [],
-                'error': 'Scrapling not installed. Install with: pip install "scrapling[all]>=0.3.7" && scrapling install',
+                'per_marketplace': {},
+                'summary': {
+                    'error': 'Scrapling not installed. Install with: pip install "scrapling[all]>=0.3.7" && scrapling install',
+                    'successful': 0,
+                    'failed': 0,
+                    'total': 0
+                },
                 'timestamp': datetime.now().isoformat()
             }
         
-        # Use Scrapling-powered scraping service
+        # Use Scrapling-powered scraping service for all marketplaces
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
         async def scrape():
-            result = await scrape_tickets(
-                marketplace=marketplace,
+            # Get the service
+            from app.services.scraping_service import get_scraping_service
+            service = await get_scraping_service()
+            
+            # Call scrape_all_marketplaces with concurrent flag
+            result = await service.scrape_all_marketplaces(
                 search_query=search_query,
-                adaptive=adaptive
+                adaptive=adaptive,
+                marketplaces=marketplaces,
+                concurrent=concurrent
             )
             
             return result
@@ -519,9 +618,15 @@ def run_scraping(marketplace: str, search_query: str, adaptive: bool = False) ->
         import traceback
         return {
             'status': 'error',
-            'platform': marketplace.lower(),
+            'total_listings': 0,
             'listings': [],
-            'error': f"{str(e)}\n{traceback.format_exc()}",
+            'per_marketplace': {},
+            'summary': {
+                'error': f"{str(e)}\n{traceback.format_exc()}",
+                'successful': 0,
+                'failed': 0,
+                'total': 0
+            },
             'timestamp': datetime.now().isoformat()
         }
 
