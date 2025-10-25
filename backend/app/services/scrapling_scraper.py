@@ -19,10 +19,16 @@ import re
 import urllib.parse
 from typing import Dict, List, Any, Optional
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
+import functools
 
 from scrapling.fetchers import StealthyFetcher
 
 logger = logging.getLogger(__name__)
+
+# Thread pool for running synchronous StealthyFetcher calls
+# This avoids Windows asyncio subprocess issues
+_executor = ThreadPoolExecutor(max_workers=4)
 
 # Supported marketplaces
 MARKETPLACES = ("stubhub", "seatgeek", "ticketmaster", "vividseats")
@@ -47,6 +53,23 @@ AWS_WAF_CONFIG = {
     "retry_attempts": 3,
     "retry_delay": 5,
 }
+
+
+async def run_sync_fetch(fetch_func, *args, **kwargs):
+    """
+    Run a synchronous StealthyFetcher operation in a thread pool.
+    This prevents Windows asyncio subprocess issues when using Playwright.
+    
+    Args:
+        fetch_func: The synchronous function to run
+        *args, **kwargs: Arguments to pass to the function
+        
+    Returns:
+        Result from the fetch function
+    """
+    loop = asyncio.get_event_loop()
+    func = functools.partial(fetch_func, *args, **kwargs)
+    return await loop.run_in_executor(_executor, func)
 
 
 class ScraplingScraperService:
@@ -256,7 +279,7 @@ class ScraplingScraperService:
                                     page_action=wait_for_reload,
                                 )
                             
-                            page = await asyncio.to_thread(fetch_search)
+                            page = await run_sync_fetch(fetch_search)
                             
                             # Check for AWS WAF challenge
                             page_html = page.html if hasattr(page, 'html') else str(page)
@@ -347,7 +370,7 @@ class ScraplingScraperService:
                     page_action=wait_for_tickets,
                 )
             
-            event_page = await asyncio.to_thread(fetch_event)
+            event_page = await run_sync_fetch(fetch_event)
             
             # Extract listings with adaptive tracking
             listing_elements = event_page.css(
@@ -440,7 +463,7 @@ class ScraplingScraperService:
                         def fetch_search():
                             return StealthyFetcher.fetch(search_url, **STEALTH_CONFIG, wait=15000)
                         
-                        page = await asyncio.to_thread(fetch_search)
+                        page = await run_sync_fetch(fetch_search)
                         
                         test_links = page.css('a[href*="/event/"], a[href*="-tickets-"]')
                         if test_links:
@@ -478,7 +501,7 @@ class ScraplingScraperService:
             def fetch_event():
                 return StealthyFetcher.fetch(event_url, **STEALTH_CONFIG, wait=15000)
             
-            event_page = await asyncio.to_thread(fetch_event)
+            event_page = await run_sync_fetch(fetch_event)
             
             # Extract listings with adaptive tracking
             listing_elements = event_page.css(
@@ -546,7 +569,7 @@ class ScraplingScraperService:
             def fetch_sync():
                 return StealthyFetcher.fetch(url, **STEALTH_CONFIG)
             
-            page = await asyncio.to_thread(fetch_sync)
+            page = await run_sync_fetch(fetch_sync)
             
             listing_elements = page.css(
                 '[data-testid="event-card"], .event-card, .offer',
@@ -605,7 +628,7 @@ class ScraplingScraperService:
             def fetch_sync():
                 return StealthyFetcher.fetch(url, **STEALTH_CONFIG)
             
-            page = await asyncio.to_thread(fetch_sync)
+            page = await run_sync_fetch(fetch_sync)
             
             listing_elements = page.css(
                 '[data-testid="listing"], .listing, .productionListItem',
