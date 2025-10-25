@@ -3,15 +3,15 @@ SeatSync Backend Services
 Unified exports for all backend service modules
 """
 
-# Scraping services
-from .scraping_service import (
-    ScrapingService,
-    get_scraping_service,
+# Scraping services - Scrapling only (production-ready)
+from .scrapling_scraper import (
+    ScraplingScraperService,
+    get_scraper_service,
     scrape_tickets
 )
 
 __all__ = [
-    'ScrapingService',
-    'get_scraping_service',
+    'ScraplingScraperService',
+    'get_scraper_service',
     'scrape_tickets',
 ]
