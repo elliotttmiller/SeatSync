@@ -106,6 +106,105 @@ async def test_marketplace_routing():
     await service.cleanup()
 
 
+@pytest.mark.asyncio
+async def test_scrape_all_marketplaces():
+    """Test scraping all marketplaces"""
+    service = await get_scraping_service()
+    
+    result = await service.scrape_all_marketplaces(
+        search_query="test"
+    )
+    
+    assert isinstance(result, dict)
+    assert 'status' in result
+    assert 'total_listings' in result
+    assert 'listings' in result
+    assert 'per_marketplace' in result
+    assert 'summary' in result
+    
+    # Check summary structure
+    summary = result['summary']
+    assert 'successful' in summary
+    assert 'failed' in summary
+    assert 'total' in summary
+    
+    # Should have results for each marketplace
+    per_marketplace = result['per_marketplace']
+    assert isinstance(per_marketplace, dict)
+    
+    await service.cleanup()
+
+
+@pytest.mark.asyncio
+async def test_scrape_all_marketplaces_with_selection():
+    """Test scraping selected marketplaces only"""
+    service = await get_scraping_service()
+    
+    # Scrape only 2 marketplaces
+    result = await service.scrape_all_marketplaces(
+        search_query="test",
+        marketplaces=["stubhub", "seatgeek"]
+    )
+    
+    assert isinstance(result, dict)
+    assert 'per_marketplace' in result
+    
+    # Should only have results for selected marketplaces
+    per_marketplace = result['per_marketplace']
+    # If scraping is not initialized, per_marketplace will be empty
+    # Otherwise, it should have results for 2 marketplaces
+    if service.initialized:
+        assert len(per_marketplace) <= 2  # May be less if some failed
+        # Check that we only have the requested marketplaces
+        for marketplace in per_marketplace.keys():
+            assert marketplace in ["stubhub", "seatgeek"]
+    
+    await service.cleanup()
+
+
+@pytest.mark.asyncio
+async def test_scrape_tickets_with_none_marketplace():
+    """Test scrape_tickets with marketplace=None routes to all marketplaces"""
+    result = await scrape_tickets(
+        marketplace=None,
+        search_query="test"
+    )
+    
+    assert isinstance(result, dict)
+    assert 'per_marketplace' in result  # Multi-marketplace result
+    assert 'total_listings' in result
+    assert 'summary' in result
+
+
+@pytest.mark.asyncio
+async def test_scrape_tickets_with_all_marketplace():
+    """Test scrape_tickets with marketplace='all' routes to all marketplaces"""
+    result = await scrape_tickets(
+        marketplace="all",
+        search_query="test"
+    )
+    
+    assert isinstance(result, dict)
+    assert 'per_marketplace' in result  # Multi-marketplace result
+    assert 'total_listings' in result
+    assert 'summary' in result
+
+
+@pytest.mark.asyncio
+async def test_scrape_tickets_with_single_marketplace():
+    """Test scrape_tickets with specific marketplace works as before"""
+    result = await scrape_tickets(
+        marketplace="stubhub",
+        search_query="test"
+    )
+    
+    assert isinstance(result, dict)
+    assert 'status' in result
+    assert 'platform' in result
+    # Single marketplace result does not have 'per_marketplace'
+    assert 'per_marketplace' not in result
+
+
 def test_import_structure():
     """Test that imports work correctly"""
     from backend.app.services import scrape_tickets, get_scraping_service, ScrapingService
