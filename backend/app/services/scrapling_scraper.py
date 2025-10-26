@@ -4,6 +4,7 @@ Modern, fully-featured scraping with all advanced capabilities enabled by defaul
 
 This service provides enterprise-grade web scraping with:
 - Full stealth mode (TLS fingerprinting, browser impersonation, stealthy headers)
+- JavaScript execution via Camoufox browser (StealthyFetcher)
 - Adaptive element tracking (survives website structure changes automatically)
 - Anti-bot detection bypass (Cloudflare, DataDome, AWS WAF)
 - 685x faster parsing than traditional methods
@@ -11,6 +12,9 @@ This service provides enterprise-grade web scraping with:
 - Human behavior simulation with intelligent delays
 - Advanced retry mechanisms with exponential backoff
 - Windows-native compatibility with optimized event loop handling
+
+Note: StealthyFetcher uses Camoufox browser for real JavaScript execution,
+enabling scraping of modern JavaScript-rendered ticketing marketplaces.
 """
 
 import logging
@@ -26,7 +30,7 @@ from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 import functools
 
-from scrapling import Fetcher
+from scrapling import StealthyFetcher
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +55,10 @@ if IS_WINDOWS:
 # On Windows, we use WindowsSelectorEventLoopPolicy for better subprocess handling
 _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix='scrapling_worker')
 
-# Configure Fetcher globally for all instances (v0.3+ API)
+# Configure StealthyFetcher globally for all instances (v0.3+ API)
 # This should be done once at module level before creating any Fetcher instances
-Fetcher.configure(adaptive=True)
+# StealthyFetcher uses Camoufox browser for JavaScript rendering and advanced stealth
+StealthyFetcher.configure(adaptive=True)
 
 # Supported marketplaces
 MARKETPLACES = ("stubhub", "seatgeek", "ticketmaster", "vividseats")
@@ -154,8 +159,13 @@ async def human_delay(min_seconds: float = 1.0, max_seconds: float = 3.0):
 
 class ScraplingScraperService:
     """
-    Production-ready scraping service powered by Scrapling v0.3.7+.
+    Production-ready scraping service powered by Scrapling v0.3.7+ with StealthyFetcher.
     All advanced features enabled by default - no optional parameters.
+    
+    Uses StealthyFetcher with Camoufox browser for:
+    - JavaScript execution (handles React/Vue/Angular rendered content)
+    - Real browser rendering (sees dynamically loaded ticket listings)
+    - Enhanced stealth (advanced anti-bot bypass)
     
     Windows Compatibility:
     - WindowsSelectorEventLoopPolicy for subprocess handling
@@ -175,18 +185,23 @@ class ScraplingScraperService:
             log_msg += " - Windows-optimized configuration active"
         logger.info(log_msg)
     
-    def _create_fetcher(self) -> Fetcher:
+    def _create_fetcher(self) -> StealthyFetcher:
         """
-        Create a new Fetcher instance with optimal configuration.
+        Create a new StealthyFetcher instance with optimal configuration.
+        
+        StealthyFetcher uses Camoufox browser for:
+        - JavaScript execution (handles dynamically loaded content)
+        - Enhanced stealth (advanced fingerprinting resistance)
+        - Real browser rendering (sees what users see)
         
         Note: Each request gets a fresh Fetcher to ensure proper browser
         rotation and avoid session fingerprinting issues.
-        Fetcher is configured globally at module level using Fetcher.configure().
+        Fetcher is configured globally at module level using StealthyFetcher.configure().
         
         Returns:
-            Configured Fetcher instance
+            Configured StealthyFetcher instance
         """
-        return Fetcher()
+        return StealthyFetcher()
     
     def _find_elements_with_fallback(self, page, selectors: List[str], context: str = "elements") -> List:
         """
@@ -404,18 +419,17 @@ class ScraplingScraperService:
                             
                             def fetch_search():
                                 fetcher = self._create_fetcher()
-                                # Rotate browser impersonation
-                                browser = get_random_browser()
-                                logger.debug(f"Using browser: {browser}")
-                                
-                                response = fetcher.get(
+                                # StealthyFetcher uses fetch() instead of get()
+                                # humanize=True simulates human behavior
+                                # wait for content to load after initial page render
+                                response = fetcher.fetch(
                                     search_url,
-                                    impersonate=browser,
-                                    **FETCHER_CONFIG
+                                    headless=True,
+                                    humanize=True,
+                                    wait=15,  # Wait 15 seconds for lazy-loaded content
+                                    network_idle=True,  # Wait for network to be idle
+                                    timeout=FETCHER_CONFIG["timeout"] * 1000,  # Convert to milliseconds
                                 )
-                                
-                                # Give AWS WAF time to validate
-                                time.sleep(AWS_WAF_CONFIG["initial_wait"])
                                 return response
                             
                             page = await run_sync_fetch(fetch_search)
@@ -497,16 +511,14 @@ class ScraplingScraperService:
             
             def fetch_event():
                 fetcher = self._create_fetcher()
-                browser = get_random_browser()
-                
-                response = fetcher.get(
+                # StealthyFetcher with real browser rendering
+                response = fetcher.fetch(
                     event_url,
-                    impersonate=browser,
-                    **FETCHER_CONFIG
+                    headless=True,
+                    humanize=True,
+                    wait=AWS_WAF_CONFIG["initial_wait"],
+                    timeout=FETCHER_CONFIG["timeout"] * 1000,
                 )
-                
-                # Wait for AWS WAF validation
-                time.sleep(AWS_WAF_CONFIG["initial_wait"])
                 return response
             
             event_page = await run_sync_fetch(fetch_event)
@@ -623,8 +635,12 @@ class ScraplingScraperService:
                     try:
                         def fetch_search():
                             fetcher = self._create_fetcher()
-                            browser = get_random_browser()
-                            return fetcher.get(search_url, impersonate=browser, **FETCHER_CONFIG)
+                            return fetcher.fetch(
+                                search_url,
+                                headless=True,
+                                humanize=True,
+                                timeout=FETCHER_CONFIG["timeout"] * 1000,
+                            )
                         
                         page = await run_sync_fetch(fetch_search)
                         
@@ -669,8 +685,12 @@ class ScraplingScraperService:
             
             def fetch_event():
                 fetcher = self._create_fetcher()
-                browser = get_random_browser()
-                return fetcher.get(event_url, impersonate=browser, **FETCHER_CONFIG)
+                return fetcher.fetch(
+                    event_url,
+                    headless=True,
+                    humanize=True,
+                    timeout=FETCHER_CONFIG["timeout"] * 1000,
+                )
             
             event_page = await run_sync_fetch(fetch_event)
             
@@ -758,8 +778,12 @@ class ScraplingScraperService:
             
             def fetch_sync():
                 fetcher = self._create_fetcher()
-                browser = get_random_browser()
-                return fetcher.get(url, impersonate=browser, **FETCHER_CONFIG)
+                return fetcher.fetch(
+                    url,
+                    headless=True,
+                    humanize=True,
+                    timeout=FETCHER_CONFIG["timeout"] * 1000,
+                )
             
             page = await run_sync_fetch(fetch_sync)
             
@@ -845,8 +869,12 @@ class ScraplingScraperService:
             
             def fetch_sync():
                 fetcher = self._create_fetcher()
-                browser = get_random_browser()
-                return fetcher.get(url, impersonate=browser, **FETCHER_CONFIG)
+                return fetcher.fetch(
+                    url,
+                    headless=True,
+                    humanize=True,
+                    timeout=FETCHER_CONFIG["timeout"] * 1000,
+                )
             
             page = await run_sync_fetch(fetch_sync)
             
