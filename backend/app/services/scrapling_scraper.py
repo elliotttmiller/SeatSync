@@ -51,6 +51,10 @@ if IS_WINDOWS:
 # On Windows, we use WindowsSelectorEventLoopPolicy for better subprocess handling
 _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix='scrapling_worker')
 
+# Configure Fetcher globally for all instances (v0.3+ API)
+# This should be done once at module level before creating any Fetcher instances
+Fetcher.configure(adaptive=True)
+
 # Supported marketplaces
 MARKETPLACES = ("stubhub", "seatgeek", "ticketmaster", "vividseats")
 
@@ -171,26 +175,18 @@ class ScraplingScraperService:
             log_msg += " - Windows-optimized configuration active"
         logger.info(log_msg)
     
-    def _create_fetcher(self, adaptive: bool = True) -> Fetcher:
+    def _create_fetcher(self) -> Fetcher:
         """
         Create a new Fetcher instance with optimal configuration.
         
         Note: Each request gets a fresh Fetcher to ensure proper browser
         rotation and avoid session fingerprinting issues.
+        Fetcher is configured globally at module level using Fetcher.configure().
         
-        Args:
-            adaptive: Enable adaptive parsing (survives DOM changes)
-            
         Returns:
             Configured Fetcher instance
         """
-        fetcher = Fetcher()
-        
-        # Configure parser for adaptive tracking if requested
-        if adaptive:
-            fetcher.configure(adaptive=True)
-        
-        return fetcher
+        return Fetcher()
     
     def _find_elements_with_fallback(self, page, selectors: List[str], context: str = "elements") -> List:
         """
@@ -407,7 +403,7 @@ class ScraplingScraperService:
                                 await asyncio.sleep(delay)
                             
                             def fetch_search():
-                                fetcher = self._create_fetcher(adaptive=True)
+                                fetcher = self._create_fetcher()
                                 # Rotate browser impersonation
                                 browser = get_random_browser()
                                 logger.debug(f"Using browser: {browser}")
@@ -500,7 +496,7 @@ class ScraplingScraperService:
             logger.info(f"Scraping tickets from: {event_url}")
             
             def fetch_event():
-                fetcher = self._create_fetcher(adaptive=True)
+                fetcher = self._create_fetcher()
                 browser = get_random_browser()
                 
                 response = fetcher.get(
@@ -626,7 +622,7 @@ class ScraplingScraperService:
                 for search_url in search_urls:
                     try:
                         def fetch_search():
-                            fetcher = self._create_fetcher(adaptive=True)
+                            fetcher = self._create_fetcher()
                             browser = get_random_browser()
                             return fetcher.get(search_url, impersonate=browser, **FETCHER_CONFIG)
                         
@@ -672,7 +668,7 @@ class ScraplingScraperService:
             logger.info(f"Scraping tickets from: {event_url}")
             
             def fetch_event():
-                fetcher = self._create_fetcher(adaptive=True)
+                fetcher = self._create_fetcher()
                 browser = get_random_browser()
                 return fetcher.get(event_url, impersonate=browser, **FETCHER_CONFIG)
             
@@ -761,7 +757,7 @@ class ScraplingScraperService:
             logger.info(f"Scraping Ticketmaster: {url}")
             
             def fetch_sync():
-                fetcher = self._create_fetcher(adaptive=True)
+                fetcher = self._create_fetcher()
                 browser = get_random_browser()
                 return fetcher.get(url, impersonate=browser, **FETCHER_CONFIG)
             
@@ -848,7 +844,7 @@ class ScraplingScraperService:
             logger.info(f"Scraping Vivid Seats: {url}")
             
             def fetch_sync():
-                fetcher = self._create_fetcher(adaptive=True)
+                fetcher = self._create_fetcher()
                 browser = get_random_browser()
                 return fetcher.get(url, impersonate=browser, **FETCHER_CONFIG)
             
