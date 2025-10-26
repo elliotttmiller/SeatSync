@@ -109,6 +109,11 @@ AWS_WAF_CONFIG = {
     "backoff_factor": 1.5,                    # Exponential backoff multiplier
 }
 
+# Content loading configuration for StealthyFetcher
+# Modern ticket marketplaces use lazy loading and require longer wait times
+CONTENT_WAIT_TIME = 10  # Wait time for general content (seconds)
+EVENT_WAIT_TIME = 15    # Wait time for event pages with ticket listings (seconds)
+
 def get_random_browser():
     """
     Get a random browser impersonation for anti-detection.
@@ -426,7 +431,7 @@ class ScraplingScraperService:
                                     search_url,
                                     headless=True,
                                     humanize=True,
-                                    wait=15,  # Wait 15 seconds for lazy-loaded content
+                                    wait=EVENT_WAIT_TIME,  # Wait for lazy-loaded content
                                     network_idle=True,  # Wait for network to be idle
                                     timeout=FETCHER_CONFIG["timeout"] * 1000,  # Convert to milliseconds
                                 )
@@ -517,7 +522,7 @@ class ScraplingScraperService:
                     event_url,
                     headless=True,
                     humanize=True,
-                    wait=15,  # Wait 15 seconds for content to fully load
+                    wait=EVENT_WAIT_TIME,  # Wait for content to fully load
                     network_idle=True,  # Wait for network idle
                     timeout=FETCHER_CONFIG["timeout"] * 1000,
                 )
@@ -641,7 +646,7 @@ class ScraplingScraperService:
                                 search_url,
                                 headless=True,
                                 humanize=True,
-                                wait=10,  # Wait for content to load
+                                wait=CONTENT_WAIT_TIME,  # Wait for content to load
                                 network_idle=True,
                                 timeout=FETCHER_CONFIG["timeout"] * 1000,
                             )
@@ -693,7 +698,7 @@ class ScraplingScraperService:
                     event_url,
                     headless=True,
                     humanize=True,
-                    wait=10,  # Wait for content to load
+                    wait=CONTENT_WAIT_TIME,  # Wait for content to load
                     network_idle=True,
                     timeout=FETCHER_CONFIG["timeout"] * 1000,
                 )
@@ -788,7 +793,7 @@ class ScraplingScraperService:
                     url,
                     headless=True,
                     humanize=True,
-                    wait=10,  # Wait for content to load
+                    wait=CONTENT_WAIT_TIME,  # Wait for content to load
                     network_idle=True,
                     timeout=FETCHER_CONFIG["timeout"] * 1000,
                 )
@@ -881,7 +886,7 @@ class ScraplingScraperService:
                     url,
                     headless=True,
                     humanize=True,
-                    wait=10,  # Wait for content to load
+                    wait=CONTENT_WAIT_TIME,  # Wait for content to load
                     network_idle=True,
                     timeout=FETCHER_CONFIG["timeout"] * 1000,
                 )
