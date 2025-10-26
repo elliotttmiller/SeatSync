@@ -512,11 +512,13 @@ class ScraplingScraperService:
             def fetch_event():
                 fetcher = self._create_fetcher()
                 # StealthyFetcher with real browser rendering
+                # Increased wait time for lazy-loaded ticket listings
                 response = fetcher.fetch(
                     event_url,
                     headless=True,
                     humanize=True,
-                    wait=AWS_WAF_CONFIG["initial_wait"],
+                    wait=15,  # Wait 15 seconds for content to fully load
+                    network_idle=True,  # Wait for network idle
                     timeout=FETCHER_CONFIG["timeout"] * 1000,
                 )
                 return response
@@ -639,6 +641,8 @@ class ScraplingScraperService:
                                 search_url,
                                 headless=True,
                                 humanize=True,
+                                wait=10,  # Wait for content to load
+                                network_idle=True,
                                 timeout=FETCHER_CONFIG["timeout"] * 1000,
                             )
                         
@@ -689,6 +693,8 @@ class ScraplingScraperService:
                     event_url,
                     headless=True,
                     humanize=True,
+                    wait=10,  # Wait for content to load
+                    network_idle=True,
                     timeout=FETCHER_CONFIG["timeout"] * 1000,
                 )
             
@@ -782,6 +788,8 @@ class ScraplingScraperService:
                     url,
                     headless=True,
                     humanize=True,
+                    wait=10,  # Wait for content to load
+                    network_idle=True,
                     timeout=FETCHER_CONFIG["timeout"] * 1000,
                 )
             
@@ -873,6 +881,8 @@ class ScraplingScraperService:
                     url,
                     headless=True,
                     humanize=True,
+                    wait=10,  # Wait for content to load
+                    network_idle=True,
                     timeout=FETCHER_CONFIG["timeout"] * 1000,
                 )
             
